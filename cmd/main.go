@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"net"
 
-	"github.com/3ssalunke/gomq/pkg"
+	_broker "github.com/3ssalunke/gomq/broker"
 	"github.com/3ssalunke/gomq/pkg/protoc"
 	"google.golang.org/grpc"
 )
@@ -12,10 +12,14 @@ import (
 func main() {
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Fatalf(err.Error())
 	}
 	grpcServer := grpc.NewServer()
-	broker := pkg.NewBroker()
-	protoc.RegisterBrokerServiceServer(grpcServer, &pkg.BrokerServiceServer{Broker: broker})
-	grpcServer.Serve(lis)
+	broker := _broker.NewBroker()
+	protoc.RegisterBrokerServiceServer(grpcServer, &_broker.BrokerServiceServer{Broker: broker})
+	log.Println("starting broker server...")
+	err = grpcServer.Serve(lis)
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
 }

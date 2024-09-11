@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v3.19.1
-// source: proto/message.proto
+// source: pkg/proto/message.proto
 
 package protoc
 
@@ -201,5 +201,5 @@ var BrokerService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "proto/message.proto",
+	Metadata: "pkg/proto/message.proto",
 }

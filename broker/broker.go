@@ -1,6 +1,8 @@
-package pkg
+package broker
 
-import "sync"
+import (
+	"sync"
+)
 
 type Broker struct {
 	Queues map[string]*Queue
