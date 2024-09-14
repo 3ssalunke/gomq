@@ -1,10 +1,13 @@
 package broker
 
-import "sync"
+import (
+	"log"
+	"sync"
+)
 
 type Message struct {
 	ID        string
-	Payload   []byte
+	Payload   string
 	Timestamp int64
 }
 
@@ -18,6 +21,7 @@ func (q *Queue) Enqueue(msg *Message) {
 	q.Mutex.Lock()
 	defer q.Mutex.Unlock()
 	q.Messages = append(q.Messages, msg)
+	log.Println("message enqueued")
 }
 
 func (q *Queue) Dequeue() *Message {
@@ -30,5 +34,6 @@ func (q *Queue) Dequeue() *Message {
 
 	msg := q.Messages[0]
 	q.Messages = q.Messages[1:]
+	log.Println("message dequeued")
 	return msg
 }

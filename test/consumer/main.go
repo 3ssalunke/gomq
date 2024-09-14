@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
-	"time"
 
 	"github.com/3ssalunke/gomq/pkg/protoc"
 	"google.golang.org/grpc"
@@ -19,11 +19,20 @@ func main() {
 
 	client := protoc.NewBrokerServiceClient(conn)
 
-	client.CreateQueue(context.TODO(), &protoc.CreateQueueRequest{Name: "Testqueue"})
-	message := &protoc.Message{
-		Id:        "00000",
-		Payload:   "hello",
-		Timestamp: time.Now().UnixMilli(),
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	stream, err := client.Consume(ctx, &protoc.Queue{Name: "TestQueue"})
+	if err != nil {
+		log.Fatal("err", err.Error())
 	}
-	client.Publish(context.TODO(), &protoc.PublishRequest{Queue: "Testqueue", Message: message})
+
+	for {
+		msg, err := stream.Recv()
+
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		fmt.Println(msg.Payload)
+	}
 }

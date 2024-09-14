@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+option go_package = "./protoc";
+package gomq.broker;
+
+message Message {
+  string id = 1;
+  string payload = 2; // JSON
+  int64 timestamp = 3;
+}
+
+message Exchange{
+  string name = 1;
+  string type = 2;
+}
+
+message Queue{
+  string name = 1;
+}
+
+message Binding{
+  string exchange = 1;
+  string queue = 2;
+  string routing_key = 3;
+}
+
+message PublishRequest {
+  string exchange = 1;
+  string routing_key = 2;
+  Message message = 3;
+}
+
+message BrokerResponse{
+  string message = 1;
+}
+
+service BrokerService {
+  rpc CreateExchange(Exchange) returns(BrokerResponse);
+  rpc CreateQueue(Queue) returns (BrokerResponse);
+  rpc BindQueue(Binding) returns (BrokerResponse);
+  rpc Publish(PublishRequest) returns (BrokerResponse);
+  rpc Consume(Queue) returns (stream Message);
+}

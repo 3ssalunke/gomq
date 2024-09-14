@@ -1,5 +1,5 @@
 proto-compile:
-	@protoc --go_out=./pkg --go-grpc_out=./pkg ./pkg/proto/message.proto
+	@protoc --go_out=./pkg --go-grpc_out=./pkg ./pkg/proto/*.proto
 
 build-broker:
 	@go build -o ./bin/broker ./cmd/main.go
@@ -10,11 +10,8 @@ run-broker-build: build-broker
 run-broker:
 	@go run ./cmd/main.go
 
-build-client:
-	@go build -o ./bin/client ./client/main.go
+run-publisher:
+	@go run ./test/publisher/main.go
 
-run-client-build: build-client
-	@./bin/client
-
-run-client:
-	@go run ./client/main.go
+run-consumer:
+	@go run ./test/consumer/main.go
