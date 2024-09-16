@@ -10,8 +10,5 @@ run-broker-build: build-broker
 run-broker:
 	@go run ./cmd/broker/main.go
 
-run-publisher:
-	@go run ./pkg/client/publisher/main.go
-
-run-consumer:
-	@go run ./pkg/client/consumer/main.go
+run-cli:
+	@go run ./cmd/cli/main.go

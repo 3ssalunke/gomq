@@ -54,6 +54,7 @@ func (b *Broker) Publish(exchange, routing_key string, msg *Message) {
 	for queue, keys := range b.bindings[exchange] {
 		for _, key := range keys {
 			if key == routing_key {
+				log.Println("debug 1")
 				b.queues[queue].Enqueue(msg)
 			}
 		}
