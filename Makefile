@@ -2,16 +2,16 @@ proto-compile:
 	@protoc --go_out=./pkg --go-grpc_out=./pkg ./pkg/proto/*.proto
 
 build-broker:
-	@go build -o ./bin/broker ./cmd/main.go
+	@go build -o ./bin/broker ./cmd/broker/main.go
 
 run-broker-build: build-broker
 	@./bin/broker
 
 run-broker:
-	@go run ./cmd/main.go
+	@go run ./cmd/broker/main.go
 
 run-publisher:
-	@go run ./test/publisher/main.go
+	@go run ./pkg/client/publisher/main.go
 
 run-consumer:
-	@go run ./test/consumer/main.go
+	@go run ./pkg/client/consumer/main.go

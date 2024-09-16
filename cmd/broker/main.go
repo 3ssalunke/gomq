@@ -4,7 +4,7 @@ import (
 	"log"
 	"net"
 
-	_broker "github.com/3ssalunke/gomq/broker"
+	_broker "github.com/3ssalunke/gomq/pkg/broker"
 	"github.com/3ssalunke/gomq/pkg/protoc"
 	"google.golang.org/grpc"
 )
