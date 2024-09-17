@@ -7,6 +7,12 @@ build-broker:
 run-broker-build: build-broker
 	@./bin/broker
 
+build-cli:
+	@go build -o ./bin/cli ./cmd/cli/main.go
+
+run-cli-build: build-cli
+	@./bin/cli
+
 run-broker:
 	@go run ./cmd/broker/main.go
 

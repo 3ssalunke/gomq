@@ -25,8 +25,9 @@ type BrokerServiceClient interface {
 	CreateExchange(ctx context.Context, in *Exchange, opts ...grpc.CallOption) (*BrokerResponse, error)
 	CreateQueue(ctx context.Context, in *Queue, opts ...grpc.CallOption) (*BrokerResponse, error)
 	BindQueue(ctx context.Context, in *Binding, opts ...grpc.CallOption) (*BrokerResponse, error)
-	Publish(ctx context.Context, in *PublishRequest, opts ...grpc.CallOption) (*BrokerResponse, error)
-	Consume(ctx context.Context, in *Queue, opts ...grpc.CallOption) (BrokerService_ConsumeClient, error)
+	PublishMessage(ctx context.Context, in *PublishMessageRequest, opts ...grpc.CallOption) (*BrokerResponse, error)
+	RetrieveMessages(ctx context.Context, in *RetrieveMessagesRequest, opts ...grpc.CallOption) (*RetrieveMessagesResponse, error)
+	ConsumeMessages(ctx context.Context, in *Queue, opts ...grpc.CallOption) (BrokerService_ConsumeMessagesClient, error)
 }
 
 type brokerServiceClient struct {
@@ -64,21 +65,30 @@ func (c *brokerServiceClient) BindQueue(ctx context.Context, in *Binding, opts .
 	return out, nil
 }
 
-func (c *brokerServiceClient) Publish(ctx context.Context, in *PublishRequest, opts ...grpc.CallOption) (*BrokerResponse, error) {
+func (c *brokerServiceClient) PublishMessage(ctx context.Context, in *PublishMessageRequest, opts ...grpc.CallOption) (*BrokerResponse, error) {
 	out := new(BrokerResponse)
-	err := c.cc.Invoke(ctx, "/gomq.broker.BrokerService/Publish", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/gomq.broker.BrokerService/PublishMessage", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *brokerServiceClient) Consume(ctx context.Context, in *Queue, opts ...grpc.CallOption) (BrokerService_ConsumeClient, error) {
-	stream, err := c.cc.NewStream(ctx, &BrokerService_ServiceDesc.Streams[0], "/gomq.broker.BrokerService/Consume", opts...)
+func (c *brokerServiceClient) RetrieveMessages(ctx context.Context, in *RetrieveMessagesRequest, opts ...grpc.CallOption) (*RetrieveMessagesResponse, error) {
+	out := new(RetrieveMessagesResponse)
+	err := c.cc.Invoke(ctx, "/gomq.broker.BrokerService/RetrieveMessages", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &brokerServiceConsumeClient{stream}
+	return out, nil
+}
+
+func (c *brokerServiceClient) ConsumeMessages(ctx context.Context, in *Queue, opts ...grpc.CallOption) (BrokerService_ConsumeMessagesClient, error) {
+	stream, err := c.cc.NewStream(ctx, &BrokerService_ServiceDesc.Streams[0], "/gomq.broker.BrokerService/ConsumeMessages", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &brokerServiceConsumeMessagesClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -88,16 +98,16 @@ func (c *brokerServiceClient) Consume(ctx context.Context, in *Queue, opts ...gr
 	return x, nil
 }
 
-type BrokerService_ConsumeClient interface {
+type BrokerService_ConsumeMessagesClient interface {
 	Recv() (*Message, error)
 	grpc.ClientStream
 }
 
-type brokerServiceConsumeClient struct {
+type brokerServiceConsumeMessagesClient struct {
 	grpc.ClientStream
 }
 
-func (x *brokerServiceConsumeClient) Recv() (*Message, error) {
+func (x *brokerServiceConsumeMessagesClient) Recv() (*Message, error) {
 	m := new(Message)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -112,8 +122,9 @@ type BrokerServiceServer interface {
 	CreateExchange(context.Context, *Exchange) (*BrokerResponse, error)
 	CreateQueue(context.Context, *Queue) (*BrokerResponse, error)
 	BindQueue(context.Context, *Binding) (*BrokerResponse, error)
-	Publish(context.Context, *PublishRequest) (*BrokerResponse, error)
-	Consume(*Queue, BrokerService_ConsumeServer) error
+	PublishMessage(context.Context, *PublishMessageRequest) (*BrokerResponse, error)
+	RetrieveMessages(context.Context, *RetrieveMessagesRequest) (*RetrieveMessagesResponse, error)
+	ConsumeMessages(*Queue, BrokerService_ConsumeMessagesServer) error
 	mustEmbedUnimplementedBrokerServiceServer()
 }
 
@@ -130,11 +141,14 @@ func (UnimplementedBrokerServiceServer) CreateQueue(context.Context, *Queue) (*B
 func (UnimplementedBrokerServiceServer) BindQueue(context.Context, *Binding) (*BrokerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BindQueue not implemented")
 }
-func (UnimplementedBrokerServiceServer) Publish(context.Context, *PublishRequest) (*BrokerResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Publish not implemented")
+func (UnimplementedBrokerServiceServer) PublishMessage(context.Context, *PublishMessageRequest) (*BrokerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PublishMessage not implemented")
 }
-func (UnimplementedBrokerServiceServer) Consume(*Queue, BrokerService_ConsumeServer) error {
-	return status.Errorf(codes.Unimplemented, "method Consume not implemented")
+func (UnimplementedBrokerServiceServer) RetrieveMessages(context.Context, *RetrieveMessagesRequest) (*RetrieveMessagesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RetrieveMessages not implemented")
+}
+func (UnimplementedBrokerServiceServer) ConsumeMessages(*Queue, BrokerService_ConsumeMessagesServer) error {
+	return status.Errorf(codes.Unimplemented, "method ConsumeMessages not implemented")
 }
 func (UnimplementedBrokerServiceServer) mustEmbedUnimplementedBrokerServiceServer() {}
 
@@ -203,42 +217,60 @@ func _BrokerService_BindQueue_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BrokerService_Publish_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PublishRequest)
+func _BrokerService_PublishMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublishMessageRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(BrokerServiceServer).Publish(ctx, in)
+		return srv.(BrokerServiceServer).PublishMessage(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/gomq.broker.BrokerService/Publish",
+		FullMethod: "/gomq.broker.BrokerService/PublishMessage",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BrokerServiceServer).Publish(ctx, req.(*PublishRequest))
+		return srv.(BrokerServiceServer).PublishMessage(ctx, req.(*PublishMessageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BrokerService_Consume_Handler(srv interface{}, stream grpc.ServerStream) error {
+func _BrokerService_RetrieveMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RetrieveMessagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BrokerServiceServer).RetrieveMessages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/gomq.broker.BrokerService/RetrieveMessages",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BrokerServiceServer).RetrieveMessages(ctx, req.(*RetrieveMessagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BrokerService_ConsumeMessages_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(Queue)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(BrokerServiceServer).Consume(m, &brokerServiceConsumeServer{stream})
+	return srv.(BrokerServiceServer).ConsumeMessages(m, &brokerServiceConsumeMessagesServer{stream})
 }
 
-type BrokerService_ConsumeServer interface {
+type BrokerService_ConsumeMessagesServer interface {
 	Send(*Message) error
 	grpc.ServerStream
 }
 
-type brokerServiceConsumeServer struct {
+type brokerServiceConsumeMessagesServer struct {
 	grpc.ServerStream
 }
 
-func (x *brokerServiceConsumeServer) Send(m *Message) error {
+func (x *brokerServiceConsumeMessagesServer) Send(m *Message) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -262,14 +294,18 @@ var BrokerService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _BrokerService_BindQueue_Handler,
 		},
 		{
-			MethodName: "Publish",
-			Handler:    _BrokerService_Publish_Handler,
+			MethodName: "PublishMessage",
+			Handler:    _BrokerService_PublishMessage_Handler,
+		},
+		{
+			MethodName: "RetrieveMessages",
+			Handler:    _BrokerService_RetrieveMessages_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "Consume",
-			Handler:       _BrokerService_Consume_Handler,
+			StreamName:    "ConsumeMessages",
+			Handler:       _BrokerService_ConsumeMessages_Handler,
 			ServerStreams: true,
 		},
 	},

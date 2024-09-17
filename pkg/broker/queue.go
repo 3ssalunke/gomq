@@ -21,7 +21,7 @@ func (q *Queue) Enqueue(msg *Message) {
 	q.Mutex.Lock()
 	defer q.Mutex.Unlock()
 	q.Messages = append(q.Messages, msg)
-	log.Println("message enqueued")
+	log.Println(msg.ID, "message enqueued")
 }
 
 func (q *Queue) Dequeue() *Message {
@@ -34,6 +34,14 @@ func (q *Queue) Dequeue() *Message {
 
 	msg := q.Messages[0]
 	q.Messages = q.Messages[1:]
-	log.Println("message dequeued")
+	log.Println(msg.ID, "message dequeued")
 	return msg
+}
+
+func (q *Queue) Peek(n int) []*Message {
+	if n > len(q.Messages) {
+		n = len(q.Messages)
+	}
+
+	return q.Messages[:n]
 }

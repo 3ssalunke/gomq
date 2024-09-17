@@ -2,6 +2,7 @@ package broker
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -28,8 +29,8 @@ func (s *BrokerServiceServer) BindQueue(ctx context.Context, req *protoc.Binding
 	return &protoc.BrokerResponse{Message: "queue binded"}, nil
 }
 
-func (s *BrokerServiceServer) Publish(ctx context.Context, req *protoc.PublishRequest) (*protoc.BrokerResponse, error) {
-	s.Broker.Publish(req.Exchange, req.RoutingKey, &Message{
+func (s *BrokerServiceServer) PublishMessage(ctx context.Context, req *protoc.PublishMessageRequest) (*protoc.BrokerResponse, error) {
+	s.Broker.PublishMessage(req.Exchange, req.RoutingKey, &Message{
 		ID:        req.Message.Id,
 		Payload:   req.Message.Payload,
 		Timestamp: req.Message.Timestamp,
@@ -37,9 +38,26 @@ func (s *BrokerServiceServer) Publish(ctx context.Context, req *protoc.PublishRe
 	return &protoc.BrokerResponse{Message: "message published"}, nil
 }
 
-func (s *BrokerServiceServer) Consume(req *protoc.Queue, stream protoc.BrokerService_ConsumeServer) error {
+func (s *BrokerServiceServer) RetrieveMessages(ctx context.Context, req *protoc.RetrieveMessagesRequest) (*protoc.RetrieveMessagesResponse, error) {
+	queueMessages := s.Broker.RetrieveMessages(req.Queue, int(req.Count))
+	pbMessages := []*protoc.Message{}
+	for _, msg := range queueMessages {
+		pbMessage := &protoc.Message{
+			Id:        msg.ID,
+			Payload:   msg.Payload,
+			Timestamp: msg.Timestamp,
+		}
+		pbMessages = append(pbMessages, pbMessage)
+	}
+	return &protoc.RetrieveMessagesResponse{
+		Messages: pbMessages,
+		Message:  fmt.Sprintf("%d messages retrieved", len(pbMessages)),
+	}, nil
+}
+
+func (s *BrokerServiceServer) ConsumeMessages(req *protoc.Queue, stream protoc.BrokerService_ConsumeMessagesServer) error {
 	for {
-		msg := s.Broker.Consume(req.Name)
+		msg := s.Broker.ConsumeMessage(req.Name)
 		if msg != nil {
 			err := stream.Send(&protoc.Message{
 				Id:        msg.ID,

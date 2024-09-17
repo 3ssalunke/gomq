@@ -70,9 +70,26 @@ func PublishMessage(exchangeName, routingKey, message string) (string, error) {
 		Payload:   message,
 		Timestamp: time.Now().UnixMilli(),
 	}
-	res, err := client.Publish(context.TODO(), &protoc.PublishRequest{Exchange: exchangeName, RoutingKey: routingKey, Message: encodedMessag})
+	res, err := client.PublishMessage(context.TODO(), &protoc.PublishMessageRequest{Exchange: exchangeName, RoutingKey: routingKey, Message: encodedMessag})
 	if err != nil {
 		return "", err
+	}
+	return res.Message, nil
+}
+
+func RetrieveMessages(queueName string, count int32) (string, error) {
+	conn, client, err := createClient()
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	res, err := client.RetrieveMessages(context.TODO(), &protoc.RetrieveMessagesRequest{Queue: queueName, Count: count})
+	if err != nil {
+		return "", err
+	}
+	for _, msg := range res.Messages {
+		log.Printf("retrieved message payload for id %s is %s", msg.Id, msg.Payload)
 	}
 	return res.Message, nil
 }
@@ -87,7 +104,7 @@ func StartConsumer(queueName string) (string, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	stream, err := client.Consume(ctx, &protoc.Queue{Name: queueName})
+	stream, err := client.ConsumeMessages(ctx, &protoc.Queue{Name: queueName})
 	if err != nil {
 		return "", err
 	}

@@ -14,6 +14,7 @@ func main() {
 	rootCmd.AddCommand(createQueueCmd)
 	rootCmd.AddCommand(bindQueueCmd)
 	rootCmd.AddCommand(publishMessageCmd)
+	rootCmd.AddCommand(retrieveMessagesCmd)
 	rootCmd.AddCommand(startConsumerCmd)
 
 	if err := rootCmd.Execute(); err != nil {
@@ -101,6 +102,26 @@ var publishMessageCmd = &cobra.Command{
 	},
 }
 
+var retrieveMessagesCmd = &cobra.Command{
+	Use:   "retrieve-messages",
+	Short: "Retrieve messages",
+	Run: func(cmd *cobra.Command, args []string) {
+		queueName, _ := cmd.Flags().GetString("queue-name")
+		count, _ := cmd.Flags().GetInt32("message-count")
+		if queueName == "" {
+			log.Fatal("please provide queue name")
+		}
+		if count == 0 {
+			log.Fatal("please provide valid message count(>0)")
+		}
+		msg, err := client.RetrieveMessages(queueName, count)
+		if err != nil {
+			log.Fatal("error while retrieving queue messages", err.Error())
+		}
+		log.Println("retrieve-messages message", msg)
+	},
+}
+
 var startConsumerCmd = &cobra.Command{
 	Use:   "start-consumer",
 	Short: "Start queue consumer",
@@ -130,4 +151,7 @@ func init() {
 	publishMessageCmd.Flags().StringP("message", "m", "", "Message string")
 
 	startConsumerCmd.Flags().StringP("queue-name", "q", "", "Name of the queue")
+
+	retrieveMessagesCmd.Flags().StringP("queue-name", "q", "", "Name of the queue")
+	retrieveMessagesCmd.Flags().Int32P("message-count", "c", 0, "Message count to be retrieved")
 }

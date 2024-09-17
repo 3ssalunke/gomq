@@ -47,23 +47,30 @@ func (b *Broker) BindQueue(exchange, queue, routing_key string) {
 	log.Println("queue binded")
 }
 
-func (b *Broker) Publish(exchange, routing_key string, msg *Message) {
+func (b *Broker) PublishMessage(exchange, routing_key string, msg *Message) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	for queue, keys := range b.bindings[exchange] {
 		for _, key := range keys {
 			if key == routing_key {
-				log.Println("debug 1")
 				b.queues[queue].Enqueue(msg)
 			}
 		}
 	}
 }
 
-func (b *Broker) Consume(queueName string) *Message {
+func (b *Broker) ConsumeMessage(queueName string) *Message {
 	if queue, ok := b.queues[queueName]; ok {
 		return queue.Dequeue()
 	}
+	return nil
+}
+
+func (b *Broker) RetrieveMessages(queueName string, n int) []*Message {
+	if queue, ok := b.queues[queueName]; ok {
+		return queue.Peek(n)
+	}
+
 	return nil
 }
