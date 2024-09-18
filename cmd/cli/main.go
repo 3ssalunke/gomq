@@ -80,7 +80,7 @@ var bindQueueCmd = &cobra.Command{
 
 var publishMessageCmd = &cobra.Command{
 	Use:   "publish-message",
-	Short: "Publish message to queue",
+	Short: "Publish message to exchange",
 	Run: func(cmd *cobra.Command, args []string) {
 		exchangeName, _ := cmd.Flags().GetString("exchange-name")
 		routingKey, _ := cmd.Flags().GetString("routing-key")
@@ -104,7 +104,7 @@ var publishMessageCmd = &cobra.Command{
 
 var retrieveMessagesCmd = &cobra.Command{
 	Use:   "retrieve-messages",
-	Short: "Retrieve messages",
+	Short: "Retrieve messages from exchange",
 	Run: func(cmd *cobra.Command, args []string) {
 		queueName, _ := cmd.Flags().GetString("queue-name")
 		count, _ := cmd.Flags().GetInt32("message-count")
