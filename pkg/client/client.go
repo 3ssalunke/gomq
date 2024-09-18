@@ -19,13 +19,13 @@ func createClient() (*grpc.ClientConn, protoc.BrokerServiceClient, error) {
 	return conn, protoc.NewBrokerServiceClient(conn), nil
 }
 
-func CreateExchange(name string) (string, error) {
+func CreateExchange(name, extype string) (string, error) {
 	conn, client, err := createClient()
 	if err != nil {
 		return "", err
 	}
 	defer conn.Close()
-	res, err := client.CreateExchange(context.TODO(), &protoc.Exchange{Name: name})
+	res, err := client.CreateExchange(context.TODO(), &protoc.Exchange{Name: name, Type: extype})
 	if err != nil {
 		return "", err
 	}

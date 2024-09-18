@@ -27,10 +27,14 @@ var createExchangeCmd = &cobra.Command{
 	Short: "Create a new exchange",
 	Run: func(cmd *cobra.Command, args []string) {
 		name, _ := cmd.Flags().GetString("exchange-name")
+		extype, _ := cmd.Flags().GetString("exchange-type")
 		if name == "" {
 			log.Fatal("please provide exchange name")
 		}
-		msg, err := client.CreateExchange(name)
+		if extype == "" {
+			log.Fatal("please provide exchange name")
+		}
+		msg, err := client.CreateExchange(name, extype)
 		if err != nil {
 			log.Fatal("error while creating exchange", err.Error())
 		}
@@ -104,7 +108,7 @@ var publishMessageCmd = &cobra.Command{
 
 var retrieveMessagesCmd = &cobra.Command{
 	Use:   "retrieve-messages",
-	Short: "Retrieve messages from exchange",
+	Short: "Retrieve messages from queue",
 	Run: func(cmd *cobra.Command, args []string) {
 		queueName, _ := cmd.Flags().GetString("queue-name")
 		count, _ := cmd.Flags().GetInt32("message-count")
@@ -139,6 +143,7 @@ var startConsumerCmd = &cobra.Command{
 
 func init() {
 	createExchangeCmd.Flags().StringP("exchange-name", "e", "", "Name of the exchange")
+	createExchangeCmd.Flags().StringP("exchange-type", "t", "", "Type of the exchange")
 
 	createQueueCmd.Flags().StringP("queue-name", "q", "", "Name of the queue")
 
