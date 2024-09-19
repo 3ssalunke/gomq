@@ -23,11 +23,11 @@ func (s *BrokerServiceServer) CreateExchange(ctx context.Context, req *protoc.Ex
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	if err := s.Broker.CreateExchange(exchangeName, exchangeType); err != nil {
+	if err := s.Broker.createExchange(exchangeName, exchangeType); err != nil {
 		return nil, err
 	}
 
-	return &protoc.BrokerResponse{Message: fmt.Sprintf("exchange %s of type %s created", exchangeName, exchangeType)}, nil
+	return &protoc.BrokerResponse{Status: true, Message: fmt.Sprintf("exchange %s of type %s created", exchangeName, exchangeType)}, nil
 }
 
 func (s *BrokerServiceServer) CreateQueue(ctx context.Context, req *protoc.Queue) (*protoc.BrokerResponse, error) {
@@ -37,11 +37,11 @@ func (s *BrokerServiceServer) CreateQueue(ctx context.Context, req *protoc.Queue
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	if err := s.Broker.CreateQueue(req.Name); err != nil {
+	if err := s.Broker.createQueue(req.Name); err != nil {
 		return nil, err
 	}
 
-	return &protoc.BrokerResponse{Message: fmt.Sprintf("queue %s created", queueName)}, nil
+	return &protoc.BrokerResponse{Status: true, Message: fmt.Sprintf("queue %s created", queueName)}, nil
 }
 
 func (s *BrokerServiceServer) BindQueue(ctx context.Context, req *protoc.Binding) (*protoc.BrokerResponse, error) {
@@ -53,11 +53,11 @@ func (s *BrokerServiceServer) BindQueue(ctx context.Context, req *protoc.Binding
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	if err := s.Broker.BindQueue(req.Exchange, req.Queue, req.RoutingKey); err != nil {
+	if err := s.Broker.bindQueue(req.Exchange, req.Queue, req.RoutingKey); err != nil {
 		return nil, err
 	}
 
-	return &protoc.BrokerResponse{Message: fmt.Sprintf("queue %s is binded to exchange %s by routing key %s", queue, exchange, routingKey)}, nil
+	return &protoc.BrokerResponse{Status: true, Message: fmt.Sprintf("queue %s is binded to exchange %s by routing key %s", queue, exchange, routingKey)}, nil
 }
 
 func (s *BrokerServiceServer) PublishMessage(ctx context.Context, req *protoc.PublishMessageRequest) (*protoc.BrokerResponse, error) {
@@ -68,7 +68,7 @@ func (s *BrokerServiceServer) PublishMessage(ctx context.Context, req *protoc.Pu
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	err := s.Broker.PublishMessage(req.Exchange, req.RoutingKey, &Message{
+	err := s.Broker.publishMessage(req.Exchange, req.RoutingKey, &Message{
 		ID:        req.Message.Id,
 		Payload:   req.Message.Payload,
 		Timestamp: req.Message.Timestamp,
@@ -77,7 +77,7 @@ func (s *BrokerServiceServer) PublishMessage(ctx context.Context, req *protoc.Pu
 		return nil, err
 	}
 
-	return &protoc.BrokerResponse{Message: fmt.Sprintf("message published to exchange %s with routing key %s", exchange, routingKey)}, nil
+	return &protoc.BrokerResponse{Status: true, Message: fmt.Sprintf("message published to exchange %s with routing key %s", exchange, routingKey)}, nil
 }
 
 func (s *BrokerServiceServer) RetrieveMessages(ctx context.Context, req *protoc.RetrieveMessagesRequest) (*protoc.RetrieveMessagesResponse, error) {
@@ -88,7 +88,7 @@ func (s *BrokerServiceServer) RetrieveMessages(ctx context.Context, req *protoc.
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	queueMessages, err := s.Broker.RetrieveMessages(req.Queue, int(req.Count))
+	queueMessages, err := s.Broker.retrieveMessages(req.Queue, int(req.Count))
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +103,7 @@ func (s *BrokerServiceServer) RetrieveMessages(ctx context.Context, req *protoc.
 	}
 
 	return &protoc.RetrieveMessagesResponse{
+		Status:   true,
 		Messages: pbMessages,
 		Message:  fmt.Sprintf("%d messages retrieved from queue %s", len(pbMessages), queue),
 	}, nil
@@ -116,7 +117,7 @@ func (s *BrokerServiceServer) ConsumeMessages(req *protoc.Queue, stream protoc.B
 	}
 
 	for {
-		msg, err := s.Broker.ConsumeMessage(req.Name)
+		msg, err := s.Broker.consumeMessage(req.Name)
 		if err != nil {
 			return err
 		}
@@ -134,4 +135,22 @@ func (s *BrokerServiceServer) ConsumeMessages(req *protoc.Queue, stream protoc.B
 			time.Sleep(time.Second)
 		}
 	}
+}
+
+func (s *BrokerServiceServer) MessageAcknowledge(ctx context.Context, req *protoc.MessageAckRequest) (*protoc.BrokerResponse, error) {
+	queueName := strings.TrimSpace(req.Queue)
+	msgID := strings.TrimSpace(req.MesssageId)
+
+	if queueName == "" || msgID == "" {
+		return nil, fmt.Errorf("invalid request arguments")
+	}
+
+	if err := s.Broker.messageAcknowledge(queueName, msgID); err != nil {
+		return nil, err
+	}
+
+	return &protoc.BrokerResponse{
+		Status:  true,
+		Message: fmt.Sprintf("message %s has been acknowledged", msgID),
+	}, nil
 }

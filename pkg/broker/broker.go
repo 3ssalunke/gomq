@@ -4,27 +4,36 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/3ssalunke/gomq/internal/util"
 )
 
 type Broker struct {
-	exchanges map[string]string
-	queues    map[string]*Queue
-	bindings  map[string]map[string][]string
+	ackTimeout  time.Duration
+	exchanges   map[string]string
+	queues      map[string]*Queue
+	pendingAcks map[string]map[string]*PendingAck
+	bindings    map[string]map[string][]string
 
 	mu sync.Mutex
 }
 
 func NewBroker() *Broker {
-	return &Broker{
-		exchanges: map[string]string{},
-		queues:    make(map[string]*Queue),
-		bindings:  map[string]map[string][]string{},
+	broker := &Broker{
+		ackTimeout:  time.Minute * 2,
+		exchanges:   make(map[string]string),
+		queues:      make(map[string]*Queue),
+		pendingAcks: make(map[string]map[string]*PendingAck),
+		bindings:    make(map[string]map[string][]string),
 	}
+
+	go broker.clearUnackMessages()
+
+	return broker
 }
 
-func (b *Broker) CreateExchange(name, exchangeType string) error {
+func (b *Broker) createExchange(name, exchangeType string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -38,7 +47,7 @@ func (b *Broker) CreateExchange(name, exchangeType string) error {
 	return nil
 }
 
-func (b *Broker) CreateQueue(name string) error {
+func (b *Broker) createQueue(name string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -52,7 +61,7 @@ func (b *Broker) CreateQueue(name string) error {
 	return nil
 }
 
-func (b *Broker) BindQueue(exchange, queue, routing_key string) error {
+func (b *Broker) bindQueue(exchange, queue, routing_key string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -70,7 +79,7 @@ func (b *Broker) BindQueue(exchange, queue, routing_key string) error {
 	return nil
 }
 
-func (b *Broker) PublishMessage(exchange, routing_key string, msg *Message) error {
+func (b *Broker) publishMessage(exchange, routing_key string, msg *Message) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -82,7 +91,7 @@ func (b *Broker) PublishMessage(exchange, routing_key string, msg *Message) erro
 	for queue, keys := range b.bindings[exchange] {
 		for _, key := range keys {
 			if key == routing_key {
-				b.queues[queue].Enqueue(msg)
+				b.queues[queue].enqueue(msg)
 				return nil
 			}
 		}
@@ -92,18 +101,64 @@ func (b *Broker) PublishMessage(exchange, routing_key string, msg *Message) erro
 	return fmt.Errorf("no queue is binded to exchange %s by routing key %s", exchange, routing_key)
 }
 
-func (b *Broker) ConsumeMessage(queueName string) (*Message, error) {
-	if util.MapContains(b.queues, queueName) {
-		return b.queues[queueName].Dequeue(), nil
+func (b *Broker) consumeMessage(queueName string) (*Message, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if !util.MapContains(b.queues, queueName) {
+		log.Printf("queue %s does not exist", queueName)
+		return nil, fmt.Errorf("queue %s does not exist", queueName)
 	}
 
-	log.Printf("queue %s does not exist", queueName)
-	return nil, fmt.Errorf("queue %s does not exist", queueName)
+	message := b.queues[queueName].dequeue()
+
+	if b.pendingAcks[queueName] == nil {
+		b.pendingAcks[queueName] = make(map[string]*PendingAck)
+	}
+	b.pendingAcks[queueName][message.ID] = &PendingAck{
+		Message:  message,
+		TimeSent: time.Now(),
+	}
+
+	return message, nil
 }
 
-func (b *Broker) RetrieveMessages(queueName string, n int) ([]*Message, error) {
+func (b *Broker) messageAcknowledge(queueName, msgID string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if !util.MapContains(b.pendingAcks, queueName) {
+		log.Printf("queue %s does not exist", queueName)
+		return fmt.Errorf("queue %s does not exist", queueName)
+	}
+
+	if !util.MapContains(b.pendingAcks[queueName], msgID) {
+		log.Printf("message %s from queue %s does not have pending acknowledgement", msgID, queueName)
+		return fmt.Errorf("message %s from queue %s does not have pending acknowledgement", msgID, queueName)
+	}
+
+	delete(b.pendingAcks[queueName], msgID)
+
+	return nil
+}
+
+func (b *Broker) clearUnackMessages() {
+	for queueName, messages := range b.pendingAcks {
+		for messageID, pending := range messages {
+			if time.Since(pending.TimeSent) > b.ackTimeout {
+				b.queues[queueName].enqueue(pending.Message)
+				delete(b.pendingAcks[queueName], messageID)
+			}
+		}
+	}
+}
+
+func (b *Broker) retrieveMessages(queueName string, n int) ([]*Message, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if util.MapContains(b.queues, queueName) {
-		return b.queues[queueName].Peek(n), nil
+		return b.queues[queueName].peek(n), nil
 	}
 
 	log.Printf("queue %s does not exist", queueName)

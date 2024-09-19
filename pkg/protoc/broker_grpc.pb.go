@@ -28,6 +28,7 @@ type BrokerServiceClient interface {
 	PublishMessage(ctx context.Context, in *PublishMessageRequest, opts ...grpc.CallOption) (*BrokerResponse, error)
 	RetrieveMessages(ctx context.Context, in *RetrieveMessagesRequest, opts ...grpc.CallOption) (*RetrieveMessagesResponse, error)
 	ConsumeMessages(ctx context.Context, in *Queue, opts ...grpc.CallOption) (BrokerService_ConsumeMessagesClient, error)
+	MessageAcknowledge(ctx context.Context, in *MessageAckRequest, opts ...grpc.CallOption) (*BrokerResponse, error)
 }
 
 type brokerServiceClient struct {
@@ -115,6 +116,15 @@ func (x *brokerServiceConsumeMessagesClient) Recv() (*Message, error) {
 	return m, nil
 }
 
+func (c *brokerServiceClient) MessageAcknowledge(ctx context.Context, in *MessageAckRequest, opts ...grpc.CallOption) (*BrokerResponse, error) {
+	out := new(BrokerResponse)
+	err := c.cc.Invoke(ctx, "/gomq.broker.BrokerService/MessageAcknowledge", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BrokerServiceServer is the server API for BrokerService service.
 // All implementations must embed UnimplementedBrokerServiceServer
 // for forward compatibility
@@ -125,6 +135,7 @@ type BrokerServiceServer interface {
 	PublishMessage(context.Context, *PublishMessageRequest) (*BrokerResponse, error)
 	RetrieveMessages(context.Context, *RetrieveMessagesRequest) (*RetrieveMessagesResponse, error)
 	ConsumeMessages(*Queue, BrokerService_ConsumeMessagesServer) error
+	MessageAcknowledge(context.Context, *MessageAckRequest) (*BrokerResponse, error)
 	mustEmbedUnimplementedBrokerServiceServer()
 }
 
@@ -149,6 +160,9 @@ func (UnimplementedBrokerServiceServer) RetrieveMessages(context.Context, *Retri
 }
 func (UnimplementedBrokerServiceServer) ConsumeMessages(*Queue, BrokerService_ConsumeMessagesServer) error {
 	return status.Errorf(codes.Unimplemented, "method ConsumeMessages not implemented")
+}
+func (UnimplementedBrokerServiceServer) MessageAcknowledge(context.Context, *MessageAckRequest) (*BrokerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method MessageAcknowledge not implemented")
 }
 func (UnimplementedBrokerServiceServer) mustEmbedUnimplementedBrokerServiceServer() {}
 
@@ -274,6 +288,24 @@ func (x *brokerServiceConsumeMessagesServer) Send(m *Message) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _BrokerService_MessageAcknowledge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MessageAckRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BrokerServiceServer).MessageAcknowledge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/gomq.broker.BrokerService/MessageAcknowledge",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BrokerServiceServer).MessageAcknowledge(ctx, req.(*MessageAckRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // BrokerService_ServiceDesc is the grpc.ServiceDesc for BrokerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -300,6 +332,10 @@ var BrokerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RetrieveMessages",
 			Handler:    _BrokerService_RetrieveMessages_Handler,
+		},
+		{
+			MethodName: "MessageAcknowledge",
+			Handler:    _BrokerService_MessageAcknowledge_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

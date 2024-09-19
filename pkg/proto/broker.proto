@@ -9,39 +9,46 @@ message Message {
   int64 timestamp = 3;
 }
 
-message Exchange{
+message Exchange {
   string name = 1;
   string type = 2;
 }
 
-message Queue{
+message Queue {
   string name = 1;
 }
 
-message Binding{
+message Binding {
   string exchange = 1;
   string queue = 2;
   string routing_key = 3;
 }
 
-message PublishMessageRequest{
+message PublishMessageRequest {
   string exchange = 1;
   string routing_key = 2;
   Message message = 3;
 }
 
-message RetrieveMessagesRequest{
+message RetrieveMessagesRequest {
   string queue = 1;
   int32 count = 2;
 }
 
-message RetrieveMessagesResponse{
-  repeated Message messages = 1;
+message RetrieveMessagesResponse {
+  bool status = 1;
   string message = 2;
+  repeated Message messages = 3;
 }
 
-message BrokerResponse{
-  string message = 1;
+message MessageAckRequest {
+  string queue = 1;
+  string messsage_id = 2;
+}
+
+message BrokerResponse {
+  bool status = 1;
+  string message = 2;
 }
 
 service BrokerService {
@@ -51,4 +58,5 @@ service BrokerService {
   rpc PublishMessage(PublishMessageRequest) returns (BrokerResponse);
   rpc RetrieveMessages(RetrieveMessagesRequest) returns  (RetrieveMessagesResponse);
   rpc ConsumeMessages(Queue) returns (stream Message);
+  rpc MessageAcknowledge(MessageAckRequest) returns (BrokerResponse);
 }

@@ -3,6 +3,7 @@ package broker
 import (
 	"log"
 	"sync"
+	"time"
 )
 
 type Message struct {
@@ -17,14 +18,19 @@ type Queue struct {
 	Mutex    sync.Mutex
 }
 
-func (q *Queue) Enqueue(msg *Message) {
+type PendingAck struct {
+	Message  *Message
+	TimeSent time.Time
+}
+
+func (q *Queue) enqueue(msg *Message) {
 	q.Mutex.Lock()
 	defer q.Mutex.Unlock()
 	q.Messages = append(q.Messages, msg)
 	log.Println(msg.ID, "message enqueued")
 }
 
-func (q *Queue) Dequeue() *Message {
+func (q *Queue) dequeue() *Message {
 	q.Mutex.Lock()
 	defer q.Mutex.Unlock()
 
@@ -38,7 +44,7 @@ func (q *Queue) Dequeue() *Message {
 	return msg
 }
 
-func (q *Queue) Peek(n int) []*Message {
+func (q *Queue) peek(n int) []*Message {
 	if n > len(q.Messages) {
 		n = len(q.Messages)
 	}
