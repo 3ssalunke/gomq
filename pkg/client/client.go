@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/3ssalunke/gomq/pkg/protoc"
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -66,7 +67,7 @@ func PublishMessage(exchangeName, routingKey, message string) (string, error) {
 	defer conn.Close()
 
 	encodedMessag := &protoc.Message{
-		Id:        "00000",
+		Id:        uuid.New().String(),
 		Payload:   message,
 		Timestamp: time.Now().UnixMilli(),
 	}
@@ -115,6 +116,8 @@ func StartConsumer(queueName string) (string, error) {
 		if err != nil {
 			return "", err
 		}
+
+		client.MessageAcknowledge(ctx, &protoc.MessageAckRequest{Queue: queueName, MesssageId: msg.Id})
 		log.Println(msg.Payload)
 	}
 }

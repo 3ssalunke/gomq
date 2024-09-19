@@ -21,7 +21,7 @@ type Broker struct {
 
 func NewBroker() *Broker {
 	broker := &Broker{
-		ackTimeout:  time.Minute * 2,
+		ackTimeout:  time.Minute * 1,
 		exchanges:   make(map[string]string),
 		queues:      make(map[string]*Queue),
 		pendingAcks: make(map[string]map[string]*PendingAck),
@@ -112,12 +112,16 @@ func (b *Broker) consumeMessage(queueName string) (*Message, error) {
 
 	message := b.queues[queueName].dequeue()
 
-	if b.pendingAcks[queueName] == nil {
-		b.pendingAcks[queueName] = make(map[string]*PendingAck)
-	}
-	b.pendingAcks[queueName][message.ID] = &PendingAck{
-		Message:  message,
-		TimeSent: time.Now(),
+	if message != nil {
+		if b.pendingAcks[queueName] == nil {
+			b.pendingAcks[queueName] = make(map[string]*PendingAck)
+		}
+		b.pendingAcks[queueName][message.ID] = &PendingAck{
+			Message:  message,
+			TimeSent: time.Now(),
+		}
+
+		log.Printf("message %s is waiting for acknowdegement", message.ID)
 	}
 
 	return message, nil
@@ -138,18 +142,25 @@ func (b *Broker) messageAcknowledge(queueName, msgID string) error {
 	}
 
 	delete(b.pendingAcks[queueName], msgID)
+	log.Printf("message %s has been acknowledged", msgID)
 
 	return nil
 }
 
 func (b *Broker) clearUnackMessages() {
-	for queueName, messages := range b.pendingAcks {
-		for messageID, pending := range messages {
-			if time.Since(pending.TimeSent) > b.ackTimeout {
-				b.queues[queueName].enqueue(pending.Message)
-				delete(b.pendingAcks[queueName], messageID)
+	for {
+		log.Printf("clearing unacknowledged messages...")
+		for queueName, messages := range b.pendingAcks {
+			for messageID, pending := range messages {
+				if time.Since(pending.TimeSent) > b.ackTimeout {
+					b.queues[queueName].enqueue(pending.Message)
+					delete(b.pendingAcks[queueName], messageID)
+
+					log.Printf("message %s has not received acknowledgement and hence re-enqueued", messageID)
+				}
 			}
 		}
+		time.Sleep(time.Second * 10)
 	}
 }
 
