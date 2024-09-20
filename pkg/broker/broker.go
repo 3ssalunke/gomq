@@ -3,6 +3,8 @@ package broker
 import (
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -15,17 +17,25 @@ type Broker struct {
 	queues      map[string]*Queue
 	pendingAcks map[string]map[string]*PendingAck
 	bindings    map[string]map[string][]string
+	fileStorage *FileStorage
 
 	mu sync.Mutex
 }
 
 func NewBroker() *Broker {
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatal("error while getting cwd", err)
+	}
+	storeagePath := filepath.Join(cwd, "store")
+
 	broker := &Broker{
 		ackTimeout:  time.Minute * 1,
 		exchanges:   make(map[string]string),
 		queues:      make(map[string]*Queue),
 		pendingAcks: make(map[string]map[string]*PendingAck),
 		bindings:    make(map[string]map[string][]string),
+		fileStorage: &FileStorage{Path: storeagePath},
 	}
 
 	go broker.clearUnackMessages()
@@ -61,7 +71,7 @@ func (b *Broker) createQueue(name string) error {
 	return nil
 }
 
-func (b *Broker) bindQueue(exchange, queue, routing_key string) error {
+func (b *Broker) bindQueue(exchange, queue, routingKey string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -69,17 +79,21 @@ func (b *Broker) bindQueue(exchange, queue, routing_key string) error {
 		b.bindings[exchange] = make(map[string][]string)
 	}
 
-	if util.SliceContains(b.bindings[exchange][queue], routing_key) {
-		log.Printf("queue %s is already binded to exchange %s with the routing key %s", queue, exchange, routing_key)
-		return fmt.Errorf("queue %s is already binded to exchange %s with the routing key %s", queue, exchange, routing_key)
+	if util.SliceContains(b.bindings[exchange][queue], routingKey) {
+		log.Printf("queue %s is already binded to exchange %s with the routing key %s", queue, exchange, routingKey)
+		return fmt.Errorf("queue %s is already binded to exchange %s with the routing key %s", queue, exchange, routingKey)
 	}
 
-	b.bindings[exchange][queue] = append(b.bindings[exchange][queue], routing_key)
-	log.Printf("queue %s is binded to exchange %s with the routing key %s", queue, exchange, routing_key)
+	b.bindings[exchange][queue] = append(b.bindings[exchange][queue], routingKey)
+	if err := b.fileStorage.createBindRouteStore(routingKey); err != nil {
+		log.Printf("error while creating a store directory for route key %s", routingKey)
+		return err
+	}
+	log.Printf("queue %s is binded to exchange %s with the routing key %s", queue, exchange, routingKey)
 	return nil
 }
 
-func (b *Broker) publishMessage(exchange, routing_key string, msg *Message) error {
+func (b *Broker) publishMessage(exchange, routingKey string, msg *Message) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -88,17 +102,21 @@ func (b *Broker) publishMessage(exchange, routing_key string, msg *Message) erro
 		return fmt.Errorf("no bindings exist for exchange %s", exchange)
 	}
 
+	if err := b.fileStorage.storeMessage(routingKey, msg); err != nil {
+		log.Printf("error while writing message %s to store file", msg.ID)
+		return err
+	}
+
 	for queue, keys := range b.bindings[exchange] {
 		for _, key := range keys {
-			if key == routing_key {
+			if key == routingKey {
 				b.queues[queue].enqueue(msg)
-				return nil
+				log.Printf("route-queue %s-%s is enqueued with message %s", routingKey, queue, msg.ID)
 			}
 		}
 	}
 
-	log.Printf("no queue is binded to exchange %s by routing key %s", exchange, routing_key)
-	return fmt.Errorf("no queue is binded to exchange %s by routing key %s", exchange, routing_key)
+	return nil
 }
 
 func (b *Broker) consumeMessage(queueName string) (*Message, error) {
@@ -160,7 +178,7 @@ func (b *Broker) clearUnackMessages() {
 				}
 			}
 		}
-		time.Sleep(time.Second * 10)
+		time.Sleep(time.Minute * 1)
 	}
 }
 

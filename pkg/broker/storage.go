@@ -1,7 +1,11 @@
 package broker
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
@@ -21,6 +25,10 @@ type Queue struct {
 type PendingAck struct {
 	Message  *Message
 	TimeSent time.Time
+}
+
+type FileStorage struct {
+	Path string
 }
 
 func (q *Queue) enqueue(msg *Message) {
@@ -50,4 +58,29 @@ func (q *Queue) peek(n int) []*Message {
 	}
 
 	return q.Messages[:n]
+}
+
+func (f *FileStorage) createBindRouteStore(routingKey string) error {
+	dir := filepath.Join(f.Path, routingKey)
+
+	_, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (f *FileStorage) storeMessage(queueName string, msg *Message) error {
+	path := filepath.Join(f.Path, queueName, fmt.Sprintf("%s.json", msg.ID))
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
 }
