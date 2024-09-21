@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -25,9 +26,15 @@ type Broker struct {
 func NewBroker() *Broker {
 	cwd, err := os.Getwd()
 	if err != nil {
-		log.Fatal("error while getting cwd", err)
+		log.Fatal("error getting cwd", err)
 	}
-	storeagePath := filepath.Join(cwd, "store")
+	statePath := filepath.Join(cwd, "store", "state")
+	messagesPath := filepath.Join(cwd, "store", "messages")
+
+	fileStorage, err := newFileStorage(statePath, messagesPath)
+	if err != nil {
+		log.Fatal("err creating broker store", err.Error())
+	}
 
 	broker := &Broker{
 		ackTimeout:  time.Minute * 1,
@@ -35,12 +42,55 @@ func NewBroker() *Broker {
 		queues:      make(map[string]*Queue),
 		pendingAcks: make(map[string]map[string]*PendingAck),
 		bindings:    make(map[string]map[string][]string),
-		fileStorage: &FileStorage{Path: storeagePath},
+		fileStorage: fileStorage,
 	}
 
 	go broker.clearUnackMessages()
 
 	return broker
+}
+
+func (b *Broker) saveState() error {
+	queues := make(map[string][]string)
+	for key, queue := range b.queues {
+		messages := make([]string, 0)
+		for _, message := range queue.Messages {
+			messages = append(messages, message.ID)
+		}
+		queues[key] = messages
+	}
+
+	pendingAcks := make(map[string][]string)
+	for queue, acks := range b.pendingAcks {
+		msgIDs := make([]string, 0)
+		for msgID := range acks {
+			msgIDs = append(msgIDs, msgID)
+		}
+		pendingAcks[queue] = msgIDs
+	}
+
+	brokerJson, err := json.Marshal(struct {
+		Exchanges  map[string]string              `json:"exchanges"`
+		Queues     map[string][]string            `json:"queues"`
+		Bindings   map[string]map[string][]string `json:"bindings"`
+		PendingAck map[string][]string            `json:"pending_acks"`
+	}{
+		Exchanges:  b.exchanges,
+		Queues:     queues,
+		Bindings:   b.bindings,
+		PendingAck: pendingAcks,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if err = b.fileStorage.storeBrokerState(brokerJson); err != nil {
+		return err
+	}
+
+	log.Println("broker state saved")
+	return nil
 }
 
 func (b *Broker) createExchange(name, exchangeType string) error {
@@ -53,6 +103,13 @@ func (b *Broker) createExchange(name, exchangeType string) error {
 	}
 
 	b.exchanges[name] = exchangeType
+	if err := b.saveState(); err != nil {
+		log.Printf("error saving broker state %s, restroing broker state...", err.Error())
+
+		delete(b.exchanges, name)
+		return err
+	}
+
 	log.Printf("exchange %s of type %s created", name, exchangeType)
 	return nil
 }
@@ -67,6 +124,13 @@ func (b *Broker) createQueue(name string) error {
 	}
 
 	b.queues[name] = &Queue{Name: name, Messages: make([]*Message, 0)}
+	if err := b.saveState(); err != nil {
+		log.Printf("error saving broker state %s, restroing broker state...", err.Error())
+
+		delete(b.queues, name)
+		return err
+	}
+
 	log.Printf("queue %s created", name)
 	return nil
 }
@@ -85,10 +149,13 @@ func (b *Broker) bindQueue(exchange, queue, routingKey string) error {
 	}
 
 	b.bindings[exchange][queue] = append(b.bindings[exchange][queue], routingKey)
-	if err := b.fileStorage.createBindRouteStore(routingKey); err != nil {
-		log.Printf("error while creating a store directory for route key %s", routingKey)
+	if err := b.saveState(); err != nil {
+		log.Printf("error saving broker state %s, restroing broker state...", err.Error())
+
+		b.bindings[exchange][queue] = b.bindings[exchange][queue][:len(b.bindings[exchange][queue])-1]
 		return err
 	}
+
 	log.Printf("queue %s is binded to exchange %s with the routing key %s", queue, exchange, routingKey)
 	return nil
 }
@@ -102,11 +169,6 @@ func (b *Broker) publishMessage(exchange, routingKey string, msg *Message) error
 		return fmt.Errorf("no bindings exist for exchange %s", exchange)
 	}
 
-	if err := b.fileStorage.storeMessage(routingKey, msg); err != nil {
-		log.Printf("error while writing message %s to store file", msg.ID)
-		return err
-	}
-
 	for queue, keys := range b.bindings[exchange] {
 		for _, key := range keys {
 			if key == routingKey {
@@ -114,6 +176,33 @@ func (b *Broker) publishMessage(exchange, routingKey string, msg *Message) error
 				log.Printf("route-queue %s-%s is enqueued with message %s", routingKey, queue, msg.ID)
 			}
 		}
+	}
+
+	if err := b.fileStorage.storeMessage(msg); err != nil {
+		log.Printf("error saving broker state %s, restroing broker state...", err.Error())
+
+		for queue, keys := range b.bindings[exchange] {
+			for _, key := range keys {
+				if key == routingKey {
+					b.queues[queue].dequeue()
+				}
+			}
+		}
+		return err
+	}
+	log.Printf("message %s saved to broker storage", msg.ID)
+
+	if err := b.saveState(); err != nil {
+		log.Printf("error saving broker state %s, restroing broker state...", err.Error())
+
+		for queue, keys := range b.bindings[exchange] {
+			for _, key := range keys {
+				if key == routingKey {
+					b.queues[queue].dequeue()
+				}
+			}
+		}
+		return err
 	}
 
 	return nil
@@ -139,6 +228,15 @@ func (b *Broker) consumeMessage(queueName string) (*Message, error) {
 			TimeSent: time.Now(),
 		}
 
+		if err := b.saveState(); err != nil {
+			log.Printf("error saving broker state %s, restroing broker state...", err.Error())
+
+			b.queues[queueName].enqueue(message)
+			delete(b.pendingAcks[queueName], message.ID)
+
+			return nil, err
+		}
+
 		log.Printf("message %s is waiting for acknowdegement", message.ID)
 	}
 
@@ -159,7 +257,17 @@ func (b *Broker) messageAcknowledge(queueName, msgID string) error {
 		return fmt.Errorf("message %s from queue %s does not have pending acknowledgement", msgID, queueName)
 	}
 
+	pendingAck := b.pendingAcks[queueName][msgID]
 	delete(b.pendingAcks[queueName], msgID)
+
+	if err := b.saveState(); err != nil {
+		log.Printf("error saving broker state %s, restroing broker state...", err.Error())
+
+		b.pendingAcks[queueName][msgID] = pendingAck
+
+		return err
+	}
+
 	log.Printf("message %s has been acknowledged", msgID)
 
 	return nil
@@ -177,6 +285,9 @@ func (b *Broker) clearUnackMessages() {
 					log.Printf("message %s has not received acknowledgement and hence re-enqueued", messageID)
 				}
 			}
+		}
+		if err := b.saveState(); err != nil {
+			log.Printf("error saving broker state %s", err.Error())
 		}
 		time.Sleep(time.Minute * 1)
 	}

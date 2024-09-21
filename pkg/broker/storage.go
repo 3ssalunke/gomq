@@ -28,7 +28,8 @@ type PendingAck struct {
 }
 
 type FileStorage struct {
-	Path string
+	MessagesPath string
+	StatePath    string
 }
 
 func (q *Queue) enqueue(msg *Message) {
@@ -60,23 +61,38 @@ func (q *Queue) peek(n int) []*Message {
 	return q.Messages[:n]
 }
 
-func (f *FileStorage) createBindRouteStore(routingKey string) error {
-	dir := filepath.Join(f.Path, routingKey)
-
-	_, err := os.Stat(dir)
+func newFileStorage(statePath, messagesPath string) (*FileStorage, error) {
+	_, err := os.Stat(statePath)
 	if os.IsNotExist(err) {
-		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-			return err
+		if err := os.MkdirAll(statePath, os.ModePerm); err != nil {
+			return nil, err
 		}
 	} else if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	_, err = os.Stat(messagesPath)
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(messagesPath, os.ModePerm); err != nil {
+			return nil, err
+		}
+	} else if err != nil {
+		return nil, err
+	}
+
+	return &FileStorage{
+		StatePath:    statePath,
+		MessagesPath: messagesPath,
+	}, nil
 }
 
-func (f *FileStorage) storeMessage(queueName string, msg *Message) error {
-	path := filepath.Join(f.Path, queueName, fmt.Sprintf("%s.json", msg.ID))
+func (f *FileStorage) storeBrokerState(brokerState []byte) error {
+	path := filepath.Join(f.StatePath, fmt.Sprintf("%s.json", "state"))
+	return os.WriteFile(path, brokerState, 0644)
+}
+
+func (f *FileStorage) storeMessage(msg *Message) error {
+	path := filepath.Join(f.MessagesPath, fmt.Sprintf("%s.json", msg.ID))
 
 	data, err := json.Marshal(msg)
 	if err != nil {
