@@ -3,6 +3,7 @@ package broker
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -26,10 +27,16 @@ type PendingAck struct {
 	Message  *Message
 	TimeSent time.Time
 }
-
 type FileStorage struct {
 	MessagesPath string
 	StatePath    string
+}
+
+type BrokerState struct {
+	Exchanges   map[string]string              `json:"exchanges"`
+	Queues      map[string][]string            `json:"queues"`
+	Bindings    map[string]map[string][]string `json:"bindings"`
+	PendingAcks map[string][]string            `json:"pending_acks"`
 }
 
 func (q *Queue) enqueue(msg *Message) {
@@ -91,6 +98,34 @@ func (f *FileStorage) storeBrokerState(brokerState []byte) error {
 	return os.WriteFile(path, brokerState, 0644)
 }
 
+func (f *FileStorage) getBrokerState() (*BrokerState, error) {
+	path := filepath.Join(f.StatePath, fmt.Sprintf("%s.json", "state"))
+
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	byteValue, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	var brokerState *BrokerState
+	err = json.Unmarshal(byteValue, &brokerState)
+	if err != nil {
+		return nil, err
+	}
+
+	return brokerState, nil
+}
+
 func (f *FileStorage) storeMessage(msg *Message) error {
 	path := filepath.Join(f.MessagesPath, fmt.Sprintf("%s.json", msg.ID))
 
@@ -99,4 +134,26 @@ func (f *FileStorage) storeMessage(msg *Message) error {
 		return err
 	}
 	return os.WriteFile(path, data, 0644)
+}
+
+func (f *FileStorage) getMessage(msgID string) (*Message, error) {
+	path := filepath.Join(f.MessagesPath, fmt.Sprintf("%s.json", msgID))
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	byteValue, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	var message *Message
+	err = json.Unmarshal(byteValue, &message)
+	if err != nil {
+		return nil, err
+	}
+
+	return message, nil
 }

@@ -45,6 +45,9 @@ func NewBroker() *Broker {
 		fileStorage: fileStorage,
 	}
 
+	if err := broker.restoreState(); err != nil {
+		log.Fatal("error restoring broker state on startup", err.Error())
+	}
 	go broker.clearUnackMessages()
 
 	return broker
@@ -69,16 +72,11 @@ func (b *Broker) saveState() error {
 		pendingAcks[queue] = msgIDs
 	}
 
-	brokerJson, err := json.Marshal(struct {
-		Exchanges  map[string]string              `json:"exchanges"`
-		Queues     map[string][]string            `json:"queues"`
-		Bindings   map[string]map[string][]string `json:"bindings"`
-		PendingAck map[string][]string            `json:"pending_acks"`
-	}{
-		Exchanges:  b.exchanges,
-		Queues:     queues,
-		Bindings:   b.bindings,
-		PendingAck: pendingAcks,
+	brokerJson, err := json.Marshal(BrokerState{
+		Exchanges:   b.exchanges,
+		Queues:      queues,
+		Bindings:    b.bindings,
+		PendingAcks: pendingAcks,
 	})
 
 	if err != nil {
@@ -90,6 +88,59 @@ func (b *Broker) saveState() error {
 	}
 
 	log.Println("broker state saved")
+	return nil
+}
+
+func (b *Broker) restoreState() error {
+	log.Println("restoring broker state on startup")
+	brokerState, err := b.fileStorage.getBrokerState()
+	if err != nil {
+		return err
+	}
+	if brokerState == nil {
+		log.Println("no broker state in store")
+		return nil
+	}
+
+	queues := make(map[string]*Queue)
+	pendingAcks := make(map[string]map[string]*PendingAck)
+
+	for queueName, msgIDs := range brokerState.Queues {
+		queue := &Queue{
+			Name:     queueName,
+			Messages: make([]*Message, 0),
+			Mutex:    sync.Mutex{},
+		}
+
+		for _, msgID := range msgIDs {
+			msg, err := b.fileStorage.getMessage(msgID)
+			if err != nil {
+				return err
+			}
+			queue.Messages = append(queue.Messages, msg)
+		}
+
+		queues[queueName] = queue
+	}
+
+	for queueName, msgIDs := range brokerState.PendingAcks {
+		for _, msgID := range msgIDs {
+			msg, err := b.fileStorage.getMessage(msgID)
+			if err != nil {
+				return err
+			}
+			pendingAcks[queueName][msgID] = &PendingAck{
+				Message:  msg,
+				TimeSent: time.Now(),
+			}
+		}
+	}
+
+	b.exchanges = brokerState.Exchanges
+	b.bindings = brokerState.Bindings
+	b.queues = queues
+	b.pendingAcks = pendingAcks
+
 	return nil
 }
 
