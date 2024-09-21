@@ -30,6 +30,20 @@ func (s *BrokerServiceServer) CreateExchange(ctx context.Context, req *protoc.Ex
 	return &protoc.BrokerResponse{Status: true, Message: fmt.Sprintf("exchange %s of type %s created", exchangeName, exchangeType)}, nil
 }
 
+func (s *BrokerServiceServer) RemoveExchange(ctx context.Context, req *protoc.RemoveExchangeRequest) (*protoc.BrokerResponse, error) {
+	exchangeName := strings.TrimSpace(req.ExchangeName)
+
+	if exchangeName == "" {
+		return nil, fmt.Errorf("invalid request arguments")
+	}
+
+	if err := s.Broker.removeExchange(exchangeName); err != nil {
+		return nil, err
+	}
+
+	return &protoc.BrokerResponse{Status: true, Message: fmt.Sprintf("exchange %s removed", exchangeName)}, nil
+}
+
 func (s *BrokerServiceServer) CreateQueue(ctx context.Context, req *protoc.Queue) (*protoc.BrokerResponse, error) {
 	queueName := strings.TrimSpace(req.Name)
 
@@ -37,11 +51,26 @@ func (s *BrokerServiceServer) CreateQueue(ctx context.Context, req *protoc.Queue
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	if err := s.Broker.createQueue(req.Name); err != nil {
+	if err := s.Broker.createQueue(queueName); err != nil {
 		return nil, err
 	}
 
 	return &protoc.BrokerResponse{Status: true, Message: fmt.Sprintf("queue %s created", queueName)}, nil
+}
+
+func (s *BrokerServiceServer) RemoveQueue(ctx context.Context, req *protoc.RemoveQueueRequest) (*protoc.BrokerResponse, error) {
+	exchangeName := strings.TrimSpace(req.ExchangeName)
+	queueName := strings.TrimSpace(req.QueueName)
+
+	if queueName == "" || exchangeName == "" {
+		return nil, fmt.Errorf("invalid request arguments")
+	}
+
+	if err := s.Broker.removeQueue(exchangeName, queueName); err != nil {
+		return nil, err
+	}
+
+	return &protoc.BrokerResponse{Status: true, Message: fmt.Sprintf("queue %s removed from exchange %s", queueName, exchangeName)}, nil
 }
 
 func (s *BrokerServiceServer) BindQueue(ctx context.Context, req *protoc.Binding) (*protoc.BrokerResponse, error) {

@@ -23,7 +23,9 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type BrokerServiceClient interface {
 	CreateExchange(ctx context.Context, in *Exchange, opts ...grpc.CallOption) (*BrokerResponse, error)
+	RemoveExchange(ctx context.Context, in *RemoveExchangeRequest, opts ...grpc.CallOption) (*BrokerResponse, error)
 	CreateQueue(ctx context.Context, in *Queue, opts ...grpc.CallOption) (*BrokerResponse, error)
+	RemoveQueue(ctx context.Context, in *RemoveQueueRequest, opts ...grpc.CallOption) (*BrokerResponse, error)
 	BindQueue(ctx context.Context, in *Binding, opts ...grpc.CallOption) (*BrokerResponse, error)
 	PublishMessage(ctx context.Context, in *PublishMessageRequest, opts ...grpc.CallOption) (*BrokerResponse, error)
 	RetrieveMessages(ctx context.Context, in *RetrieveMessagesRequest, opts ...grpc.CallOption) (*RetrieveMessagesResponse, error)
@@ -48,9 +50,27 @@ func (c *brokerServiceClient) CreateExchange(ctx context.Context, in *Exchange, 
 	return out, nil
 }
 
+func (c *brokerServiceClient) RemoveExchange(ctx context.Context, in *RemoveExchangeRequest, opts ...grpc.CallOption) (*BrokerResponse, error) {
+	out := new(BrokerResponse)
+	err := c.cc.Invoke(ctx, "/gomq.broker.BrokerService/RemoveExchange", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *brokerServiceClient) CreateQueue(ctx context.Context, in *Queue, opts ...grpc.CallOption) (*BrokerResponse, error) {
 	out := new(BrokerResponse)
 	err := c.cc.Invoke(ctx, "/gomq.broker.BrokerService/CreateQueue", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *brokerServiceClient) RemoveQueue(ctx context.Context, in *RemoveQueueRequest, opts ...grpc.CallOption) (*BrokerResponse, error) {
+	out := new(BrokerResponse)
+	err := c.cc.Invoke(ctx, "/gomq.broker.BrokerService/RemoveQueue", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +150,9 @@ func (c *brokerServiceClient) MessageAcknowledge(ctx context.Context, in *Messag
 // for forward compatibility
 type BrokerServiceServer interface {
 	CreateExchange(context.Context, *Exchange) (*BrokerResponse, error)
+	RemoveExchange(context.Context, *RemoveExchangeRequest) (*BrokerResponse, error)
 	CreateQueue(context.Context, *Queue) (*BrokerResponse, error)
+	RemoveQueue(context.Context, *RemoveQueueRequest) (*BrokerResponse, error)
 	BindQueue(context.Context, *Binding) (*BrokerResponse, error)
 	PublishMessage(context.Context, *PublishMessageRequest) (*BrokerResponse, error)
 	RetrieveMessages(context.Context, *RetrieveMessagesRequest) (*RetrieveMessagesResponse, error)
@@ -146,8 +168,14 @@ type UnimplementedBrokerServiceServer struct {
 func (UnimplementedBrokerServiceServer) CreateExchange(context.Context, *Exchange) (*BrokerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateExchange not implemented")
 }
+func (UnimplementedBrokerServiceServer) RemoveExchange(context.Context, *RemoveExchangeRequest) (*BrokerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveExchange not implemented")
+}
 func (UnimplementedBrokerServiceServer) CreateQueue(context.Context, *Queue) (*BrokerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateQueue not implemented")
+}
+func (UnimplementedBrokerServiceServer) RemoveQueue(context.Context, *RemoveQueueRequest) (*BrokerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveQueue not implemented")
 }
 func (UnimplementedBrokerServiceServer) BindQueue(context.Context, *Binding) (*BrokerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BindQueue not implemented")
@@ -195,6 +223,24 @@ func _BrokerService_CreateExchange_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BrokerService_RemoveExchange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveExchangeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BrokerServiceServer).RemoveExchange(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/gomq.broker.BrokerService/RemoveExchange",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BrokerServiceServer).RemoveExchange(ctx, req.(*RemoveExchangeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _BrokerService_CreateQueue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Queue)
 	if err := dec(in); err != nil {
@@ -209,6 +255,24 @@ func _BrokerService_CreateQueue_Handler(srv interface{}, ctx context.Context, de
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(BrokerServiceServer).CreateQueue(ctx, req.(*Queue))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BrokerService_RemoveQueue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveQueueRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BrokerServiceServer).RemoveQueue(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/gomq.broker.BrokerService/RemoveQueue",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BrokerServiceServer).RemoveQueue(ctx, req.(*RemoveQueueRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -318,8 +382,16 @@ var BrokerService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _BrokerService_CreateExchange_Handler,
 		},
 		{
+			MethodName: "RemoveExchange",
+			Handler:    _BrokerService_RemoveExchange_Handler,
+		},
+		{
 			MethodName: "CreateQueue",
 			Handler:    _BrokerService_CreateQueue_Handler,
+		},
+		{
+			MethodName: "RemoveQueue",
+			Handler:    _BrokerService_RemoveQueue_Handler,
 		},
 		{
 			MethodName: "BindQueue",

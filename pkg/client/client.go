@@ -26,7 +26,22 @@ func CreateExchange(name, extype string) (string, error) {
 		return "", err
 	}
 	defer conn.Close()
+
 	res, err := client.CreateExchange(context.TODO(), &protoc.Exchange{Name: name, Type: extype})
+	if err != nil {
+		return "", err
+	}
+	return res.Message, nil
+}
+
+func RemoveExchange(name string) (string, error) {
+	conn, client, err := createClient()
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	res, err := client.RemoveExchange(context.TODO(), &protoc.RemoveExchangeRequest{ExchangeName: name})
 	if err != nil {
 		return "", err
 	}
@@ -39,7 +54,22 @@ func CreateQueue(name string) (string, error) {
 		return "", err
 	}
 	defer conn.Close()
+
 	res, err := client.CreateQueue(context.TODO(), &protoc.Queue{Name: name})
+	if err != nil {
+		return "", err
+	}
+	return res.Message, nil
+}
+
+func RemoveQueue(exchangeName, queueName string) (string, error) {
+	conn, client, err := createClient()
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	res, err := client.RemoveQueue(context.TODO(), &protoc.RemoveQueueRequest{ExchangeName: exchangeName, QueueName: queueName})
 	if err != nil {
 		return "", err
 	}
@@ -52,6 +82,7 @@ func BindQueue(exchangeName, queueName, routingKey string) (string, error) {
 		return "", err
 	}
 	defer conn.Close()
+
 	res, err := client.BindQueue(context.TODO(), &protoc.Binding{Exchange: exchangeName, Queue: queueName, RoutingKey: routingKey})
 	if err != nil {
 		return "", err

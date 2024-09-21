@@ -165,6 +165,48 @@ func (b *Broker) createExchange(name, exchangeType string) error {
 	return nil
 }
 
+func (b *Broker) removeExchange(name string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if !util.MapContains(b.exchanges, name) {
+		log.Printf("exchange with the name %s does not exists", name)
+		return fmt.Errorf("exchange with the name %s does not exists", name)
+	}
+
+	exchangeType := b.exchanges[name]
+	var bindings map[string][]string
+	var queues map[string]*Queue
+
+	if util.MapContains(b.bindings, name) {
+		bindings = b.bindings[name]
+		for queueName := range bindings {
+			if queues == nil {
+				queues = map[string]*Queue{}
+			}
+			queues[queueName] = b.queues[queueName]
+			delete(b.queues, queueName)
+		}
+	}
+
+	delete(b.exchanges, name)
+	delete(b.bindings, name)
+
+	if err := b.saveState(); err != nil {
+		log.Printf("error saving broker state %s, restroing broker state...", err.Error())
+
+		b.exchanges[name] = exchangeType
+		b.bindings[name] = bindings
+		for queueName, queue := range queues {
+			b.queues[queueName] = queue
+		}
+		return err
+	}
+
+	log.Printf("exchange %s of type %s removed", name, exchangeType)
+	return nil
+}
+
 func (b *Broker) createQueue(name string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -183,6 +225,37 @@ func (b *Broker) createQueue(name string) error {
 	}
 
 	log.Printf("queue %s created", name)
+	return nil
+}
+
+func (b *Broker) removeQueue(exchangeName, queueName string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if !util.MapContains(b.exchanges, exchangeName) {
+		log.Printf("exchange with the name %s does not exist", exchangeName)
+		return fmt.Errorf("exchange with the name %s does not exist", exchangeName)
+	}
+
+	if !util.MapContains(b.queues, queueName) {
+		log.Printf("queue with the name %s does not exist", queueName)
+		return fmt.Errorf("queue with the name %s does not exist", queueName)
+	}
+
+	queue := b.queues[queueName]
+	bindings := b.bindings[exchangeName][queueName]
+
+	delete(b.queues, queueName)
+	delete(b.bindings[exchangeName], queueName)
+	if err := b.saveState(); err != nil {
+		log.Printf("error saving broker state %s, restroing broker state...", err.Error())
+
+		b.queues[queueName] = queue
+		b.bindings[exchangeName][queueName] = bindings
+		return err
+	}
+
+	log.Printf("queue %s created", queueName)
 	return nil
 }
 

@@ -11,7 +11,9 @@ func main() {
 	var rootCmd = &cobra.Command{Use: "gomq-cli"}
 
 	rootCmd.AddCommand(createExchangeCmd)
+	rootCmd.AddCommand(removeExchangeCmd)
 	rootCmd.AddCommand(createQueueCmd)
+	rootCmd.AddCommand(removeQueueCmd)
 	rootCmd.AddCommand(bindQueueCmd)
 	rootCmd.AddCommand(publishMessageCmd)
 	rootCmd.AddCommand(retrieveMessagesCmd)
@@ -32,13 +34,30 @@ var createExchangeCmd = &cobra.Command{
 			log.Fatal("please provide exchange name")
 		}
 		if extype == "" {
-			log.Fatal("please provide exchange name")
+			log.Fatal("please provide exchange type")
 		}
 		msg, err := client.CreateExchange(name, extype)
 		if err != nil {
 			log.Fatal("error while creating exchange", err.Error())
 		}
 		log.Println("create-exchange message", msg)
+	},
+}
+
+var removeExchangeCmd = &cobra.Command{
+	Use:   "remove-exchange",
+	Short: "Remove a new exchange from broker",
+	Run: func(cmd *cobra.Command, args []string) {
+		name, _ := cmd.Flags().GetString("exchange-name")
+		if name == "" {
+			log.Fatal("please provide exchange name")
+		}
+
+		msg, err := client.RemoveExchange(name)
+		if err != nil {
+			log.Fatal("error while removing exchange", err.Error())
+		}
+		log.Println("remove-exchange message", msg)
 	},
 }
 
@@ -52,9 +71,29 @@ var createQueueCmd = &cobra.Command{
 		}
 		msg, err := client.CreateQueue(name)
 		if err != nil {
-			log.Fatal("error while creating exchange", err.Error())
+			log.Fatal("error while creating queue", err.Error())
 		}
 		log.Println("create-queue message", msg)
+	},
+}
+
+var removeQueueCmd = &cobra.Command{
+	Use:   "remove-queue",
+	Short: "Remove an queue from exchange",
+	Run: func(cmd *cobra.Command, args []string) {
+		queueName, _ := cmd.Flags().GetString("queue-name")
+		exchangeName, _ := cmd.Flags().GetString("exchange-name")
+		if queueName == "" {
+			log.Fatal("please provide queue name")
+		}
+		if exchangeName == "" {
+			log.Fatal("please provide exchange name")
+		}
+		msg, err := client.RemoveQueue(exchangeName, queueName)
+		if err != nil {
+			log.Fatal("error while removing queue", err.Error())
+		}
+		log.Println("remove-queue message", msg)
 	},
 }
 
@@ -145,7 +184,12 @@ func init() {
 	createExchangeCmd.Flags().StringP("exchange-name", "e", "", "Name of the exchange")
 	createExchangeCmd.Flags().StringP("exchange-type", "t", "", "Type of the exchange")
 
+	removeExchangeCmd.Flags().StringP("exchange-name", "e", "", "Name of the exchange")
+
 	createQueueCmd.Flags().StringP("queue-name", "q", "", "Name of the queue")
+
+	removeQueueCmd.Flags().StringP("queue-name", "q", "", "Name of the queue")
+	removeQueueCmd.Flags().StringP("exchange-name", "e", "", "Name of the exchange")
 
 	bindQueueCmd.Flags().StringP("exchange-name", "e", "", "Name of the exchange")
 	bindQueueCmd.Flags().StringP("queue-name", "q", "", "Name of the queue")
