@@ -29,3 +29,7 @@ func RemoveAllWhiteSpaces(s string) string {
 		return r
 	}, s)
 }
+
+func RemoveArrayElement[T comparable](s []T, index int) []T {
+	return append(s[:index], s[index+1:]...)
+}

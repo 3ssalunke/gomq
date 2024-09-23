@@ -16,6 +16,7 @@ import (
 type Consumer struct {
 	ID      string
 	MsgChan chan *Message
+	Retries int
 }
 
 type ConsumersList struct {
@@ -367,6 +368,7 @@ func (b *Broker) createConsumer(queueName string) (*Consumer, error) {
 	consumer := &Consumer{
 		ID:      consumerID,
 		MsgChan: make(chan *Message),
+		Retries: 0,
 	}
 
 	if !util.MapContains(b.consumers, queueName) {
@@ -418,7 +420,18 @@ func (b *Broker) consumeMessage(queueName string, stopChan chan bool) {
 				nextIndex := (lastIndex + 1) % len(b.consumers[queueName].Consumers)
 
 				consumer := b.consumers[queueName].Consumers[nextIndex]
-				consumer.MsgChan <- message
+
+				select {
+				case consumer.MsgChan <- message:
+					log.Printf("message %s sent to consumer %s channel", message.ID, consumer.ID)
+				default:
+					log.Printf("consumer %s message channel is closed - Retries %d", consumer.ID, consumer.Retries)
+					consumer.Retries += 1
+
+					if consumer.Retries >= 2 {
+						b.consumers[queueName].Consumers = util.RemoveArrayElement(b.consumers[queueName].Consumers, nextIndex)
+					}
+				}
 
 				b.consumers[queueName].LastIndex = nextIndex
 
@@ -475,7 +488,7 @@ func (b *Broker) clearUnackMessages() {
 		if err := b.saveState(); err != nil {
 			log.Printf("error saving broker state %s", err.Error())
 		}
-		time.Sleep(time.Minute * 1)
+		time.Sleep(time.Minute * 5)
 	}
 }
 
