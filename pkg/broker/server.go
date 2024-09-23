@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"github.com/3ssalunke/gomq/pkg/protoc"
 )
@@ -139,17 +138,18 @@ func (s *BrokerServiceServer) RetrieveMessages(ctx context.Context, req *protoc.
 }
 
 func (s *BrokerServiceServer) ConsumeMessages(req *protoc.Queue, stream protoc.BrokerService_ConsumeMessagesServer) error {
-	queue := strings.TrimSpace(req.Name)
+	queueName := strings.TrimSpace(req.Name)
 
-	if queue == "" {
+	if queueName == "" {
 		return fmt.Errorf("invalid request arguments")
 	}
 
-	for {
-		msg, err := s.Broker.consumeMessage(req.Name)
-		if err != nil {
-			return err
-		}
+	consumer, err := s.Broker.createConsumer(queueName)
+	if err != nil {
+		return err
+	}
+
+	for msg := range consumer.MsgChan {
 		if msg != nil {
 			err := stream.Send(&protoc.Message{
 				Id:        msg.ID,
@@ -160,10 +160,10 @@ func (s *BrokerServiceServer) ConsumeMessages(req *protoc.Queue, stream protoc.B
 				log.Println(err)
 				return err
 			}
-		} else {
-			time.Sleep(time.Second)
 		}
 	}
+
+	return fmt.Errorf("message channel for consumer %s closed", consumer.ID)
 }
 
 func (s *BrokerServiceServer) MessageAcknowledge(ctx context.Context, req *protoc.MessageAckRequest) (*protoc.BrokerResponse, error) {

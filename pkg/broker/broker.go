@@ -10,15 +10,28 @@ import (
 	"time"
 
 	"github.com/3ssalunke/gomq/internal/util"
+	"github.com/google/uuid"
 )
 
+type Consumer struct {
+	ID      string
+	MsgChan chan *Message
+}
+
+type ConsumersList struct {
+	Consumers []*Consumer
+	LastIndex int
+}
+
 type Broker struct {
-	ackTimeout  time.Duration
-	exchanges   map[string]string
-	queues      map[string]*Queue
-	pendingAcks map[string]map[string]*PendingAck
-	bindings    map[string]map[string][]string
-	fileStorage *FileStorage
+	ackTimeout        time.Duration
+	exchanges         map[string]string
+	queues            map[string]*Queue
+	pendingAcks       map[string]map[string]*PendingAck
+	bindings          map[string]map[string][]string
+	consumers         map[string]*ConsumersList
+	stopConsumerChans map[string]chan bool
+	fileStorage       *FileStorage
 
 	mu sync.Mutex
 }
@@ -37,12 +50,14 @@ func NewBroker() *Broker {
 	}
 
 	broker := &Broker{
-		ackTimeout:  time.Minute * 1,
-		exchanges:   make(map[string]string),
-		queues:      make(map[string]*Queue),
-		pendingAcks: make(map[string]map[string]*PendingAck),
-		bindings:    make(map[string]map[string][]string),
-		fileStorage: fileStorage,
+		ackTimeout:        time.Minute * 1,
+		exchanges:         make(map[string]string),
+		queues:            make(map[string]*Queue),
+		pendingAcks:       make(map[string]map[string]*PendingAck),
+		bindings:          make(map[string]map[string][]string),
+		consumers:         make(map[string]*ConsumersList),
+		stopConsumerChans: make(map[string]chan bool),
+		fileStorage:       fileStorage,
 	}
 
 	if err := broker.restoreState(); err != nil {
@@ -128,6 +143,9 @@ func (b *Broker) restoreState() error {
 			msg, err := b.fileStorage.getMessage(msgID)
 			if err != nil {
 				return err
+			}
+			if !util.MapContains(pendingAcks, queueName) {
+				pendingAcks[queueName] = make(map[string]*PendingAck)
 			}
 			pendingAcks[queueName][msgID] = &PendingAck{
 				Message:  msg,
@@ -332,7 +350,7 @@ func (b *Broker) publishMessage(exchange, routingKey string, msg *Message) error
 	return nil
 }
 
-func (b *Broker) consumeMessage(queueName string) (*Message, error) {
+func (b *Broker) createConsumer(queueName string) (*Consumer, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -341,30 +359,74 @@ func (b *Broker) consumeMessage(queueName string) (*Message, error) {
 		return nil, fmt.Errorf("queue %s does not exist", queueName)
 	}
 
-	message := b.queues[queueName].dequeue()
-
-	if message != nil {
-		if b.pendingAcks[queueName] == nil {
-			b.pendingAcks[queueName] = make(map[string]*PendingAck)
-		}
-		b.pendingAcks[queueName][message.ID] = &PendingAck{
-			Message:  message,
-			TimeSent: time.Now(),
-		}
-
-		if err := b.saveState(); err != nil {
-			log.Printf("error saving broker state %s, restroing broker state...", err.Error())
-
-			b.queues[queueName].enqueue(message)
-			delete(b.pendingAcks[queueName], message.ID)
-
-			return nil, err
-		}
-
-		log.Printf("message %s is waiting for acknowdegement", message.ID)
+	if util.MapContains(b.stopConsumerChans, queueName) {
+		b.stopConsumerChans[queueName] <- true
 	}
 
-	return message, nil
+	consumerID := uuid.New().String()
+	consumer := &Consumer{
+		ID:      consumerID,
+		MsgChan: make(chan *Message),
+	}
+
+	if !util.MapContains(b.consumers, queueName) {
+		b.consumers[queueName] = &ConsumersList{
+			LastIndex: 0,
+			Consumers: make([]*Consumer, 0),
+		}
+	}
+
+	b.consumers[queueName] = &ConsumersList{
+		LastIndex: 0,
+		Consumers: append(b.consumers[queueName].Consumers, consumer),
+	}
+	stopChan := make(chan bool)
+	b.stopConsumerChans[queueName] = stopChan
+
+	go b.consumeMessage(queueName, stopChan)
+
+	return consumer, nil
+}
+
+func (b *Broker) consumeMessage(queueName string, stopChan chan bool) {
+	for {
+		select {
+		case <-stopChan:
+			return
+		default:
+			message := b.queues[queueName].dequeue()
+
+			if message != nil {
+				if b.pendingAcks[queueName] == nil {
+					b.pendingAcks[queueName] = make(map[string]*PendingAck)
+				}
+				b.pendingAcks[queueName][message.ID] = &PendingAck{
+					Message:  message,
+					TimeSent: time.Now(),
+				}
+
+				if err := b.saveState(); err != nil {
+					log.Printf("error saving broker state %s, restroing broker state...", err.Error())
+
+					b.queues[queueName].enqueue(message)
+					delete(b.pendingAcks[queueName], message.ID)
+
+					continue
+				}
+
+				lastIndex := b.consumers[queueName].LastIndex
+				nextIndex := (lastIndex + 1) % len(b.consumers[queueName].Consumers)
+
+				consumer := b.consumers[queueName].Consumers[nextIndex]
+				consumer.MsgChan <- message
+
+				b.consumers[queueName].LastIndex = nextIndex
+
+				log.Printf("message %s is waiting for acknowdegement", message.ID)
+			}
+
+		}
+	}
 }
 
 func (b *Broker) messageAcknowledge(queueName, msgID string) error {
