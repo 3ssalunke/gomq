@@ -175,7 +175,7 @@ var startConsumerCmd = &cobra.Command{
 		}
 		_, err := client.StartConsumer(queueName)
 		if err != nil {
-			log.Fatal("error while consuming queue messages", err.Error())
+			log.Fatal("error while consuming queue messages: ", err.Error())
 		}
 	},
 }

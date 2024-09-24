@@ -2,13 +2,16 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/3ssalunke/gomq/pkg/protoc"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 func createClient() (*grpc.ClientConn, protoc.BrokerServiceClient, error) {
@@ -141,11 +144,47 @@ func StartConsumer(queueName string) (string, error) {
 		return "", err
 	}
 
+	streamRetries := 0
+	connectionRetries := 0
+	streamBackoffWaitTime := 5
+	connectionBackoffWaitTime := 5
+
 	for {
-		msg, err := stream.Recv()
+		var msg *protoc.Message
+
+		if stream != nil {
+			msg, err = stream.Recv()
+		}
 
 		if err != nil {
-			return "", err
+			if status.Code(err) == codes.Unavailable {
+				if connectionRetries > 3 {
+					return "", fmt.Errorf("broker crashed")
+				}
+
+				connectionRetries++
+				time.Sleep(time.Second * time.Duration(connectionBackoffWaitTime))
+				connectionBackoffWaitTime = connectionBackoffWaitTime * 2
+
+				stream, err = client.ConsumeMessages(ctx, &protoc.Queue{Name: queueName})
+				continue
+
+			}
+
+			if streamRetries > 3 {
+				return "", fmt.Errorf("broker stream crashed")
+			}
+			streamRetries++
+			time.Sleep(time.Second * time.Duration(streamBackoffWaitTime))
+			streamBackoffWaitTime = streamBackoffWaitTime * 2
+			continue
+		}
+
+		if streamRetries > 0 {
+			streamRetries = 0
+		}
+		if connectionRetries > 0 {
+			connectionRetries = 0
 		}
 
 		client.MessageAcknowledge(ctx, &protoc.MessageAckRequest{Queue: queueName, MesssageId: msg.Id})
