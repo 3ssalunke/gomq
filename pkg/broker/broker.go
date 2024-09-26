@@ -13,6 +13,10 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	MAX_RETRIES = int8(3)
+)
+
 type Consumer struct {
 	ID      string
 	MsgChan chan *Message
@@ -32,6 +36,7 @@ type Broker struct {
 	bindings          map[string]map[string][]string
 	consumers         map[string]*ConsumersList
 	stopConsumerChans map[string]chan bool
+	messageRetries    map[string]int8
 	fileStorage       *FileStorage
 
 	mu sync.Mutex
@@ -51,13 +56,14 @@ func NewBroker() *Broker {
 	}
 
 	broker := &Broker{
-		ackTimeout:        time.Minute * 1,
+		ackTimeout:        time.Second * 10,
 		exchanges:         make(map[string]string),
 		queues:            make(map[string]*Queue),
 		pendingAcks:       make(map[string]map[string]*PendingAck),
 		bindings:          make(map[string]map[string][]string),
 		consumers:         make(map[string]*ConsumersList),
 		stopConsumerChans: make(map[string]chan bool),
+		messageRetries:    make(map[string]int8),
 		fileStorage:       fileStorage,
 	}
 
@@ -390,6 +396,22 @@ func (b *Broker) createConsumer(queueName string) (*Consumer, error) {
 	return consumer, nil
 }
 
+func (b *Broker) moveToDLQ(dlqName string, message *Message) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if !util.MapContains(b.queues, dlqName) {
+		b.queues[dlqName] = &Queue{
+			Name:     dlqName,
+			Messages: make([]*Message, 0),
+			Mutex:    sync.Mutex{},
+		}
+	}
+
+	b.queues[dlqName].Messages = append(b.queues[dlqName].Messages, message)
+	log.Printf("max retries exceeded, message %s moved to dlq %s", message.ID, dlqName)
+}
+
 func (b *Broker) consumeMessage(queueName string, stopChan chan bool) {
 	for {
 		select {
@@ -399,6 +421,26 @@ func (b *Broker) consumeMessage(queueName string, stopChan chan bool) {
 			message := b.queues[queueName].dequeue()
 
 			if message != nil {
+				retries, found := b.messageRetries[message.ID]
+				if !found {
+					b.messageRetries[message.ID] = 0
+				}
+				if found && retries > MAX_RETRIES {
+					dlqName := fmt.Sprintf("%s-dead-letter", queueName)
+					b.moveToDLQ(dlqName, message)
+					delete(b.pendingAcks[queueName], message.ID)
+
+					err := b.saveState()
+					if err == nil {
+						continue
+					}
+
+					log.Printf("error saving broker state %s, restroing broker state...", err.Error())
+					b.queues[dlqName].Messages = util.RemoveArrayElement(b.queues[dlqName].Messages, len(b.queues[dlqName].Messages)-1)
+				}
+
+				b.messageRetries[message.ID] = retries + 1
+
 				if b.pendingAcks[queueName] == nil {
 					b.pendingAcks[queueName] = make(map[string]*PendingAck)
 				}
@@ -458,6 +500,7 @@ func (b *Broker) messageAcknowledge(queueName, msgID string) error {
 
 	pendingAck := b.pendingAcks[queueName][msgID]
 	delete(b.pendingAcks[queueName], msgID)
+	delete(b.messageRetries, msgID)
 
 	if err := b.saveState(); err != nil {
 		log.Printf("error saving broker state %s, restroing broker state...", err.Error())
@@ -488,7 +531,7 @@ func (b *Broker) clearUnackMessages() {
 		if err := b.saveState(); err != nil {
 			log.Printf("error saving broker state %s", err.Error())
 		}
-		time.Sleep(time.Minute * 5)
+		time.Sleep(time.Second * 10)
 	}
 }
 
