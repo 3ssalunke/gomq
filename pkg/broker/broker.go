@@ -67,12 +67,33 @@ func NewBroker() *Broker {
 		fileStorage:       fileStorage,
 	}
 
-	if err := broker.restoreState(); err != nil {
+	if err := broker.restoreBroker(); err != nil {
 		log.Fatal("error restoring broker state on startup", err.Error())
 	}
 	go broker.clearUnackMessages()
 
 	return broker
+}
+
+func (b *Broker) saveMetadata() error {
+	queueConfigs := make(map[string]QueueConfig)
+	for key, queue := range b.queues {
+		queueConfigs[key] = queue.Config
+	}
+
+	metadataJson, err := json.Marshal(&BrokerMetadata{
+		QueueConfigs: queueConfigs,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err = b.fileStorage.storeBrokerMetadata(metadataJson); err != nil {
+		return err
+	}
+
+	log.Println("broker metadata saved")
+	return nil
 }
 
 func (b *Broker) saveState() error {
@@ -94,7 +115,7 @@ func (b *Broker) saveState() error {
 		pendingAcks[queue] = msgIDs
 	}
 
-	brokerJson, err := json.Marshal(BrokerState{
+	stateJson, err := json.Marshal(BrokerState{
 		Exchanges:   b.exchanges,
 		Queues:      queues,
 		Bindings:    b.bindings,
@@ -105,7 +126,7 @@ func (b *Broker) saveState() error {
 		return err
 	}
 
-	if err = b.fileStorage.storeBrokerState(brokerJson); err != nil {
+	if err = b.fileStorage.storeBrokerState(stateJson); err != nil {
 		return err
 	}
 
@@ -113,7 +134,7 @@ func (b *Broker) saveState() error {
 	return nil
 }
 
-func (b *Broker) restoreState() error {
+func (b *Broker) restoreBroker() error {
 	log.Println("restoring broker state on startup")
 	brokerState, err := b.fileStorage.getBrokerState()
 	if err != nil {
@@ -124,12 +145,29 @@ func (b *Broker) restoreState() error {
 		return nil
 	}
 
+	brokerMetadata, err := b.fileStorage.getBrokerMetadata()
+	if err != nil {
+		return err
+	}
+	if brokerMetadata == nil {
+		log.Println("no metadata in store")
+		return nil
+	}
+
 	queues := make(map[string]*Queue)
 	pendingAcks := make(map[string]map[string]*PendingAck)
 
 	for queueName, msgIDs := range brokerState.Queues {
+		var config QueueConfig
+		if util.MapContains(brokerMetadata.QueueConfigs, queueName) {
+			config = brokerMetadata.QueueConfigs[queueName]
+		} else {
+			log.Printf("no queue config metadata found for %s", queueName)
+			return fmt.Errorf("no queue config metadata found for %s", queueName)
+		}
 		queue := &Queue{
 			Name:     queueName,
+			Config:   config,
 			Messages: make([]*Message, 0),
 			Mutex:    sync.Mutex{},
 		}
@@ -232,20 +270,43 @@ func (b *Broker) removeExchange(name string) error {
 	return nil
 }
 
-func (b *Broker) createQueue(name string) error {
+func (b *Broker) createQueue(name string, config QueueConfig) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
+	var dlqName string
 
 	if util.MapContains(b.queues, name) {
 		log.Printf("queue with the name %s already exists", name)
 		return fmt.Errorf("queue with the name %s already exists", name)
 	}
 
-	b.queues[name] = &Queue{Name: name, Messages: make([]*Message, 0)}
+	if config.DLQ {
+		dlqName = fmt.Sprintf("%s-dead-letter", name)
+		if util.MapContains(b.queues, dlqName) {
+			log.Printf("dead letter queue with the name %s already exists", dlqName)
+			return fmt.Errorf("dead letter queue with the name %s already exists", dlqName)
+		}
+	}
+
+	b.queues[name] = &Queue{Name: name, Config: config, Messages: make([]*Message, 0), Mutex: sync.Mutex{}}
+
+	if config.DLQ {
+		b.queues[dlqName] = &Queue{Name: dlqName, Config: QueueConfig{DLQ: false, MaxRetries: 0}, Messages: make([]*Message, 0), Mutex: sync.Mutex{}}
+	}
+
+	if err := b.saveMetadata(); err != nil {
+		log.Printf("error saving broker metadata %s, restroing broker state...", err.Error())
+
+		delete(b.queues, name)
+		delete(b.queues, dlqName)
+		return err
+	}
 	if err := b.saveState(); err != nil {
 		log.Printf("error saving broker state %s, restroing broker state...", err.Error())
 
 		delete(b.queues, name)
+		delete(b.queues, dlqName)
 		return err
 	}
 
@@ -290,6 +351,11 @@ func (b *Broker) bindQueue(exchange, queue, routingKey string) error {
 
 	if b.bindings[exchange] == nil {
 		b.bindings[exchange] = make(map[string][]string)
+	}
+
+	if !util.MapContains(b.queues, queue) {
+		log.Printf("queue %s does not exist for exchange %s", queue, exchange)
+		return fmt.Errorf("queue %s does not exist for exchange %s", queue, exchange)
 	}
 
 	if util.SliceContains(b.bindings[exchange][queue], routingKey) {
@@ -413,6 +479,9 @@ func (b *Broker) moveToDLQ(dlqName string, message *Message) {
 }
 
 func (b *Broker) consumeMessage(queueName string, stopChan chan bool) {
+	dlq := b.queues[queueName].Config.DLQ
+	maxRetries := b.queues[queueName].Config.MaxRetries
+
 	for {
 		select {
 		case <-stopChan:
@@ -425,10 +494,14 @@ func (b *Broker) consumeMessage(queueName string, stopChan chan bool) {
 				if !found {
 					b.messageRetries[message.ID] = 0
 				}
-				if found && retries > MAX_RETRIES {
-					dlqName := fmt.Sprintf("%s-dead-letter", queueName)
-					b.moveToDLQ(dlqName, message)
+				if found && retries > maxRetries {
+					var dlqName string
+					if dlq {
+						dlqName = fmt.Sprintf("%s-dead-letter", queueName)
+						b.moveToDLQ(dlqName, message)
+					}
 					delete(b.pendingAcks[queueName], message.ID)
+					delete(b.messageRetries, message.ID)
 
 					err := b.saveState()
 					if err == nil {
@@ -436,7 +509,9 @@ func (b *Broker) consumeMessage(queueName string, stopChan chan bool) {
 					}
 
 					log.Printf("error saving broker state %s, restroing broker state...", err.Error())
-					b.queues[dlqName].Messages = util.RemoveArrayElement(b.queues[dlqName].Messages, len(b.queues[dlqName].Messages)-1)
+					if dlq {
+						b.queues[dlqName].Messages = util.RemoveArrayElement(b.queues[dlqName].Messages, len(b.queues[dlqName].Messages)-1)
+					}
 				}
 
 				b.messageRetries[message.ID] = retries + 1

@@ -16,6 +16,8 @@ message Exchange {
 
 message Queue {
   string name = 1;
+  bool dlq = 2;
+  int32 max_retries = 3;
 }
 
 message Binding {

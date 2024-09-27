@@ -51,14 +51,20 @@ func RemoveExchange(name string) (string, error) {
 	return res.Message, nil
 }
 
-func CreateQueue(name string) (string, error) {
+func CreateQueue(name string, dlq bool, maxRetries int8) (string, error) {
 	conn, client, err := createClient()
 	if err != nil {
 		return "", err
 	}
 	defer conn.Close()
 
-	res, err := client.CreateQueue(context.TODO(), &protoc.Queue{Name: name})
+	queue := &protoc.Queue{
+		Name:       name,
+		Dlq:        dlq,
+		MaxRetries: int32(maxRetries),
+	}
+
+	res, err := client.CreateQueue(context.TODO(), queue)
 	if err != nil {
 		return "", err
 	}

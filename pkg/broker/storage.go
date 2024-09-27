@@ -17,8 +17,14 @@ type Message struct {
 	Timestamp int64
 }
 
+type QueueConfig struct {
+	DLQ        bool
+	MaxRetries int8
+}
+
 type Queue struct {
 	Name     string
+	Config   QueueConfig
 	Messages []*Message
 	Mutex    sync.Mutex
 }
@@ -37,6 +43,10 @@ type BrokerState struct {
 	Queues      map[string][]string            `json:"queues"`
 	Bindings    map[string]map[string][]string `json:"bindings"`
 	PendingAcks map[string][]string            `json:"pending_acks"`
+}
+
+type BrokerMetadata struct {
+	QueueConfigs map[string]QueueConfig `json:"queue_configs"`
 }
 
 func (q *Queue) enqueue(msg *Message) {
@@ -91,6 +101,39 @@ func newFileStorage(statePath, messagesPath string) (*FileStorage, error) {
 		StatePath:    statePath,
 		MessagesPath: messagesPath,
 	}, nil
+}
+
+func (f *FileStorage) storeBrokerMetadata(metadata []byte) error {
+	path := filepath.Join(f.StatePath, fmt.Sprintf("%s.json", "metadata"))
+	return os.WriteFile(path, metadata, 0644)
+}
+
+func (f *FileStorage) getBrokerMetadata() (*BrokerMetadata, error) {
+	path := filepath.Join(f.StatePath, fmt.Sprintf("%s.json", "metadata"))
+
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	byteValue, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	var brokerMetadata *BrokerMetadata
+	err = json.Unmarshal(byteValue, &brokerMetadata)
+	if err != nil {
+		return nil, err
+	}
+
+	return brokerMetadata, nil
 }
 
 func (f *FileStorage) storeBrokerState(brokerState []byte) error {

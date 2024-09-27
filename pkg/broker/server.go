@@ -45,12 +45,16 @@ func (s *BrokerServiceServer) RemoveExchange(ctx context.Context, req *protoc.Re
 
 func (s *BrokerServiceServer) CreateQueue(ctx context.Context, req *protoc.Queue) (*protoc.BrokerResponse, error) {
 	queueName := strings.TrimSpace(req.Name)
+	queueConfig := QueueConfig{
+		DLQ:        req.Dlq,
+		MaxRetries: int8(req.MaxRetries),
+	}
 
 	if queueName == "" {
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	if err := s.Broker.createQueue(queueName); err != nil {
+	if err := s.Broker.createQueue(queueName, queueConfig); err != nil {
 		return nil, err
 	}
 

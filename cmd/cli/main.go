@@ -66,10 +66,17 @@ var createQueueCmd = &cobra.Command{
 	Short: "Create a new queue",
 	Run: func(cmd *cobra.Command, args []string) {
 		name, _ := cmd.Flags().GetString("queue-name")
+		dlq, _ := cmd.Flags().GetBool("queue-dlq")
+		maxRetries, _ := cmd.Flags().GetInt8("max-retries")
+
 		if name == "" {
 			log.Fatal("please provide queue name")
 		}
-		msg, err := client.CreateQueue(name)
+		if dlq && maxRetries == 0 {
+			log.Fatal("please enter max retries count for message")
+		}
+
+		msg, err := client.CreateQueue(name, dlq, maxRetries)
 		if err != nil {
 			log.Fatal("error while creating queue", err.Error())
 		}
@@ -89,6 +96,7 @@ var removeQueueCmd = &cobra.Command{
 		if exchangeName == "" {
 			log.Fatal("please provide exchange name")
 		}
+
 		msg, err := client.RemoveQueue(exchangeName, queueName)
 		if err != nil {
 			log.Fatal("error while removing queue", err.Error())
@@ -113,6 +121,7 @@ var bindQueueCmd = &cobra.Command{
 		if routingKey == "" {
 			log.Fatal("please provide routing key")
 		}
+
 		msg, err := client.BindQueue(exchangeName, queueName, routingKey)
 		if err != nil {
 			log.Fatal("error while queue binding", err.Error())
@@ -137,6 +146,7 @@ var publishMessageCmd = &cobra.Command{
 		if message == "" {
 			log.Fatal("please provide queue name")
 		}
+
 		msg, err := client.PublishMessage(exchangeName, routingKey, message)
 		if err != nil {
 			log.Fatal("error while publishing message", err.Error())
@@ -157,6 +167,7 @@ var retrieveMessagesCmd = &cobra.Command{
 		if count == 0 {
 			log.Fatal("please provide valid message count(>0)")
 		}
+
 		msg, err := client.RetrieveMessages(queueName, count)
 		if err != nil {
 			log.Fatal("error while retrieving queue messages", err.Error())
@@ -173,6 +184,7 @@ var startConsumerCmd = &cobra.Command{
 		if queueName == "" {
 			log.Fatal("please provide queue name")
 		}
+
 		_, err := client.StartConsumer(queueName)
 		if err != nil {
 			log.Fatal("error while consuming queue messages: ", err.Error())
@@ -187,6 +199,8 @@ func init() {
 	removeExchangeCmd.Flags().StringP("exchange-name", "e", "", "Name of the exchange")
 
 	createQueueCmd.Flags().StringP("queue-name", "q", "", "Name of the queue")
+	createQueueCmd.Flags().BoolP("queue-dlq", "d", false, "Dead letter queue")
+	createQueueCmd.Flags().Int8P("max-retries", "r", 0, "Max retries for Dead letter")
 
 	removeQueueCmd.Flags().StringP("queue-name", "q", "", "Name of the queue")
 	removeQueueCmd.Flags().StringP("exchange-name", "e", "", "Name of the exchange")
