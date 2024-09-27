@@ -1,8 +1,8 @@
 # GoMQ - A Golang Message Queue with Protobuf Support
 
-GoMQ is a lightweight, custom message queue playground built in Golang, offering native Protobuf support for structured message serialization. It includes a **broker server** for managing exchanges, queues, and message publishing, as well as a **CLI** for interacting with the message broker.
+GoMQ is a lightweight, custom message queue playground built in Golang, offering native Protobuf support for structured message serialization. It includes a **broker server** for managing exchanges, queues, message publishing and delivering, as well as a **CLI** for interacting with the message broker.
 
-This README provides instructions to set up the broker server and use the CLI for common tasks like creating exchanges, queues, binding queues, publishing messages and setting up consumers to the queues.
+This README provides instructions to set up the broker server and use the CLI for common tasks like creating exchanges, queues, bindings, publishing messages and setting up consumers for the queues.
 
 ## Features
 
@@ -22,7 +22,7 @@ This README provides instructions to set up the broker server and use the CLI fo
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/gomq.git
+git clone https://github.com/3ssalunke/gomq.git
 cd gomq
 ```
 
@@ -35,31 +35,65 @@ go mod tidy
 ### Running the Broker Server
 
 ````markdown
-## Running the Broker Server
-
 ### Step 1: Compile the Broker Server
 
 ```bash
 go build -o ./bin/broker.exe ./cmd/broker/main.go
 ```
-````
 
-### Step 2: Compile the Broker Server
+### Step 2: Run the Broker Server
 
-```
+```bash
 ./bin/broker
 ```
+````
+
+By default, the server listens on localhost:50051 for incoming gRPC connections.
 
 ### Using the CLI
 
-````markdown
 ## Using the GoMQ CLI
 
 The GoMQ CLI provides an interface for interacting with the broker, allowing you to create exchanges, queues, bindings, publish messages and setup consumers.
 
+````markdown
 ### Step 1: Compile the CLI
 
 ```bash
-go build -o gomq-cli ./cmd/cli.go
+go build -o ./bin/cli.exe ./cmd/cli/main.go
+```
+
+### Step 1: CLI Usage
+
+Below are some common tasks you can perform with the GoMQ CLI:
+
+## Create an Exchange
+
+```bash
+./bin/cli create-exchange -e ExchangeName -t ExchangeType
+```
+
+## Create an Queue
+
+```bash
+./bin/cli create-queue -q QueueName -d true -m 5
+```
+
+## Bind a queue
+
+```bash
+./bin/cli bind-queue -e ExchangeName -q QueueName -k RoutingKey
+```
+
+## Publish a message
+
+```bash
+./bin/cli publish-message -e ExchangeName -k RoutingKey -m "Message Payload (JSON)"
+```
+
+## Start a consumer
+
+```bash
+./bin/cli start-consumer -q QueueName
 ```
 ````
