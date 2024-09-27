@@ -34,19 +34,17 @@ go mod tidy
 
 ### Running the Broker Server
 
-````markdown
-### Step 1: Compile the Broker Server
+#### Step 1: Compile the Broker Server
 
 ```bash
 go build -o ./bin/broker.exe ./cmd/broker/main.go
 ```
 
-### Step 2: Run the Broker Server
+#### Step 2: Run the Broker Server
 
 ```bash
 ./bin/broker
 ```
-````
 
 By default, the server listens on localhost:50051 for incoming gRPC connections.
 
@@ -54,44 +52,42 @@ By default, the server listens on localhost:50051 for incoming gRPC connections.
 
 The GoMQ CLI provides an interface for interacting with the broker, allowing you to create exchanges, queues, bindings, publish messages and setup consumers.
 
-````markdown
 ### Step 1: Compile the CLI
 
 ```bash
 go build -o ./bin/cli.exe ./cmd/cli/main.go
 ```
 
-### Step 1: CLI Usage
+### Step 2: CLI Usage
 
 Below are some common tasks you can perform with the GoMQ CLI:
 
-## Create an Exchange
+#### Create an Exchange
 
 ```bash
 ./bin/cli create-exchange -e ExchangeName -t ExchangeType
 ```
 
-## Create an Queue
+#### Create an Queue
 
 ```bash
 ./bin/cli create-queue -q QueueName -d true -m 5
 ```
 
-## Bind a queue
+#### Bind a queue
 
 ```bash
 ./bin/cli bind-queue -e ExchangeName -q QueueName -k RoutingKey
 ```
 
-## Publish a message
+#### Publish a message
 
 ```bash
 ./bin/cli publish-message -e ExchangeName -k RoutingKey -m "Message Payload (JSON)"
 ```
 
-## Start a consumer
+#### Start a consumer
 
 ```bash
 ./bin/cli start-consumer -q QueueName
 ```
-````
