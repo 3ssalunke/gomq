@@ -50,9 +50,7 @@ go build -o ./bin/broker.exe ./cmd/broker/main.go
 
 By default, the server listens on localhost:50051 for incoming gRPC connections.
 
-### Using the CLI
-
-## Using the GoMQ CLI
+## Using the CLI
 
 The GoMQ CLI provides an interface for interacting with the broker, allowing you to create exchanges, queues, bindings, publish messages and setup consumers.
 
