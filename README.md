@@ -91,3 +91,7 @@ Below are some common tasks you can perform with the GoMQ CLI:
 ```bash
 ./bin/cli start-consumer -q QueueName
 ```
+
+```markdown
+For all commands, you can use the `--help` flag to get detailed information about the command and its usage.
+```
