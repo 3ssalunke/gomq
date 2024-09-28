@@ -65,31 +65,37 @@ Below are some common tasks you can perform with the GoMQ CLI:
 #### Create an Exchange
 
 ```bash
-./bin/cli create-exchange -e ExchangeName -t ExchangeType
+./bin/cli create-exchange -e <exchange-name> -t <exchange-type>
 ```
 
 #### Create an Queue
 
 ```bash
-./bin/cli create-queue -q QueueName -d true -m 5
+./bin/cli create-queue -q <queue-name> -d true -m 5
 ```
 
 #### Bind a queue
 
 ```bash
-./bin/cli bind-queue -e ExchangeName -q QueueName -k RoutingKey
+./bin/cli bind-queue -e <exchange-name> -q <queue-name> -k <routing-key>
 ```
 
 #### Publish a message
 
 ```bash
-./bin/cli publish-message -e ExchangeName -k RoutingKey -m "Message Payload (JSON)"
+./bin/cli publish-message -e <exchange-name> -k <routing-key> -m <json-payload>
 ```
 
 #### Start a consumer
 
 ```bash
-./bin/cli start-consumer -q QueueName
+./bin/cli start-consumer -q <queue-name>
+```
+
+#### Redrive messages to main queue
+
+```bash
+./bin/cli redrive-messages -q <queue-name>
 ```
 
 ```markdown
