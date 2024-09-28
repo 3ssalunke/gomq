@@ -187,3 +187,20 @@ func (s *BrokerServiceServer) MessageAcknowledge(ctx context.Context, req *proto
 		Message: fmt.Sprintf("message %s has been acknowledged", msgID),
 	}, nil
 }
+
+func (s *BrokerServiceServer) RedriveDlqMessages(ctx context.Context, req *protoc.Queue) (*protoc.BrokerResponse, error) {
+	queueName := strings.TrimSpace(req.Name)
+
+	if queueName == "" {
+		return nil, fmt.Errorf("invalid request arguments")
+	}
+
+	if err := s.Broker.redriveDlqMessages(queueName); err != nil {
+		return nil, err
+	}
+
+	return &protoc.BrokerResponse{
+		Status:  true,
+		Message: fmt.Sprintf("Messages redrived to %s", queueName),
+	}, nil
+}

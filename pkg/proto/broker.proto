@@ -72,4 +72,5 @@ service BrokerService {
   rpc RetrieveMessages(RetrieveMessagesRequest) returns  (RetrieveMessagesResponse);
   rpc ConsumeMessages(Queue) returns (stream Message);
   rpc MessageAcknowledge(MessageAckRequest) returns (BrokerResponse);
+  rpc RedriveDlqMessages(Queue) returns (BrokerResponse);
 }

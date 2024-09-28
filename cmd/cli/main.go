@@ -18,6 +18,7 @@ func main() {
 	rootCmd.AddCommand(publishMessageCmd)
 	rootCmd.AddCommand(retrieveMessagesCmd)
 	rootCmd.AddCommand(startConsumerCmd)
+	rootCmd.AddCommand(redriveDlqMessagesCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err.Error())
@@ -185,9 +186,26 @@ var startConsumerCmd = &cobra.Command{
 			log.Fatal("please provide queue name")
 		}
 
-		_, err := client.StartConsumer(queueName)
+		msg, err := client.StartConsumer(queueName)
 		if err != nil {
 			log.Fatal("error while consuming queue messages: ", err.Error())
+		}
+		log.Println("messages redrived", msg)
+	},
+}
+
+var redriveDlqMessagesCmd = &cobra.Command{
+	Use:   "redrive-messages",
+	Short: "Redrive DLQ messages to parent queue",
+	Run: func(cmd *cobra.Command, args []string) {
+		queueName, _ := cmd.Flags().GetString("queue-name")
+		if queueName == "" {
+			log.Fatal("plase provide queue name")
+		}
+
+		_, err := client.RedriveDlqMessages(queueName)
+		if err != nil {
+			log.Fatal("error while redriving dlq messages: ", err.Error())
 		}
 	},
 }
@@ -217,4 +235,6 @@ func init() {
 
 	retrieveMessagesCmd.Flags().StringP("queue-name", "q", "", "Name of the queue")
 	retrieveMessagesCmd.Flags().Int32P("message-count", "c", 0, "Message count to be retrieved")
+
+	redriveDlqMessagesCmd.Flags().StringP("queue-name", "q", "", "Name of the queue")
 }

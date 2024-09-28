@@ -193,7 +193,22 @@ func StartConsumer(queueName string) (string, error) {
 			connectionRetries = 0
 		}
 
-		client.MessageAcknowledge(ctx, &protoc.MessageAckRequest{Queue: queueName, MesssageId: msg.Id})
+		// client.MessageAcknowledge(ctx, &protoc.MessageAckRequest{Queue: queueName, MesssageId: msg.Id})
 		log.Println(msg.Payload)
 	}
+}
+
+func RedriveDlqMessages(queueName string) (string, error) {
+	conn, client, err := createClient()
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	res, err := client.RedriveDlqMessages(context.TODO(), &protoc.Queue{Name: queueName})
+	if err != nil {
+		return "", err
+	}
+	log.Println(res.Message)
+	return res.Message, nil
 }

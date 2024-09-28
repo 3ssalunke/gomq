@@ -510,7 +510,7 @@ func (b *Broker) consumeMessage(queueName string, stopChan chan bool) {
 
 					log.Printf("error saving broker state %s, restroing broker state...", err.Error())
 					if dlq {
-						b.queues[dlqName].Messages = util.RemoveArrayElement(b.queues[dlqName].Messages, len(b.queues[dlqName].Messages)-1)
+						b.queues[dlqName].Messages = util.RemoveArrayElement(b.queues[dlqName].Messages, b.queues[dlqName].size()-1)
 					}
 				}
 
@@ -620,4 +620,24 @@ func (b *Broker) retrieveMessages(queueName string, n int) ([]*Message, error) {
 
 	log.Printf("queue %s does not exist", queueName)
 	return nil, fmt.Errorf("queue %s does not exist", queueName)
+}
+
+func (b *Broker) redriveDlqMessages(queueName string) error {
+	dlqName := fmt.Sprintf("%s-dead-letter", queueName)
+
+	if !util.MapContains(b.queues, queueName) {
+		log.Printf("queue %s does not exist", queueName)
+		return fmt.Errorf("queue %s does not exist", queueName)
+	}
+	if !util.MapContains(b.queues, dlqName) {
+		log.Printf("DLQ for queue %s does not exist", queueName)
+		return fmt.Errorf("DLQ for queue %s does not exist", queueName)
+	}
+
+	for b.queues[dlqName].size() > 0 {
+		message := b.queues[dlqName].dequeue()
+		b.queues[queueName].enqueue(message)
+	}
+
+	return nil
 }

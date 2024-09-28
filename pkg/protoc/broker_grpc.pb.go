@@ -31,6 +31,7 @@ type BrokerServiceClient interface {
 	RetrieveMessages(ctx context.Context, in *RetrieveMessagesRequest, opts ...grpc.CallOption) (*RetrieveMessagesResponse, error)
 	ConsumeMessages(ctx context.Context, in *Queue, opts ...grpc.CallOption) (BrokerService_ConsumeMessagesClient, error)
 	MessageAcknowledge(ctx context.Context, in *MessageAckRequest, opts ...grpc.CallOption) (*BrokerResponse, error)
+	RedriveDlqMessages(ctx context.Context, in *Queue, opts ...grpc.CallOption) (*BrokerResponse, error)
 }
 
 type brokerServiceClient struct {
@@ -145,6 +146,15 @@ func (c *brokerServiceClient) MessageAcknowledge(ctx context.Context, in *Messag
 	return out, nil
 }
 
+func (c *brokerServiceClient) RedriveDlqMessages(ctx context.Context, in *Queue, opts ...grpc.CallOption) (*BrokerResponse, error) {
+	out := new(BrokerResponse)
+	err := c.cc.Invoke(ctx, "/gomq.broker.BrokerService/RedriveDlqMessages", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BrokerServiceServer is the server API for BrokerService service.
 // All implementations must embed UnimplementedBrokerServiceServer
 // for forward compatibility
@@ -158,6 +168,7 @@ type BrokerServiceServer interface {
 	RetrieveMessages(context.Context, *RetrieveMessagesRequest) (*RetrieveMessagesResponse, error)
 	ConsumeMessages(*Queue, BrokerService_ConsumeMessagesServer) error
 	MessageAcknowledge(context.Context, *MessageAckRequest) (*BrokerResponse, error)
+	RedriveDlqMessages(context.Context, *Queue) (*BrokerResponse, error)
 	mustEmbedUnimplementedBrokerServiceServer()
 }
 
@@ -191,6 +202,9 @@ func (UnimplementedBrokerServiceServer) ConsumeMessages(*Queue, BrokerService_Co
 }
 func (UnimplementedBrokerServiceServer) MessageAcknowledge(context.Context, *MessageAckRequest) (*BrokerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MessageAcknowledge not implemented")
+}
+func (UnimplementedBrokerServiceServer) RedriveDlqMessages(context.Context, *Queue) (*BrokerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RedriveDlqMessages not implemented")
 }
 func (UnimplementedBrokerServiceServer) mustEmbedUnimplementedBrokerServiceServer() {}
 
@@ -370,6 +384,24 @@ func _BrokerService_MessageAcknowledge_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BrokerService_RedriveDlqMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Queue)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BrokerServiceServer).RedriveDlqMessages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/gomq.broker.BrokerService/RedriveDlqMessages",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BrokerServiceServer).RedriveDlqMessages(ctx, req.(*Queue))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // BrokerService_ServiceDesc is the grpc.ServiceDesc for BrokerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -408,6 +440,10 @@ var BrokerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "MessageAcknowledge",
 			Handler:    _BrokerService_MessageAcknowledge_Handler,
+		},
+		{
+			MethodName: "RedriveDlqMessages",
+			Handler:    _BrokerService_RedriveDlqMessages_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

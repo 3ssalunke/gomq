@@ -78,6 +78,10 @@ func (q *Queue) peek(n int) []*Message {
 	return q.Messages[:n]
 }
 
+func (q *Queue) size() int {
+	return len(q.Messages)
+}
+
 func newFileStorage(statePath, messagesPath string) (*FileStorage, error) {
 	_, err := os.Stat(statePath)
 	if os.IsNotExist(err) {
