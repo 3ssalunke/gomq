@@ -193,7 +193,7 @@ func StartConsumer(queueName string) (string, error) {
 			connectionRetries = 0
 		}
 
-		// client.MessageAcknowledge(ctx, &protoc.MessageAckRequest{Queue: queueName, MesssageId: msg.Id})
+		client.MessageAcknowledge(ctx, &protoc.MessageAckRequest{Queue: queueName, MesssageId: msg.Id})
 		log.Println(msg.Payload)
 	}
 }

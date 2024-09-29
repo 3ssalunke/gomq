@@ -432,10 +432,6 @@ func (b *Broker) createConsumer(queueName string) (*Consumer, error) {
 		return nil, fmt.Errorf("queue %s does not exist", queueName)
 	}
 
-	if util.MapContains(b.stopConsumerChans, queueName) {
-		b.stopConsumerChans[queueName] <- true
-	}
-
 	consumerID := uuid.New().String()
 	consumer := &Consumer{
 		ID:      consumerID,
@@ -450,12 +446,20 @@ func (b *Broker) createConsumer(queueName string) (*Consumer, error) {
 		}
 	}
 
-	b.consumers[queueName] = &ConsumersList{
-		LastIndex: 0,
-		Consumers: append(b.consumers[queueName].Consumers, consumer),
+	if len(b.consumers[queueName].Consumers) > 0 {
+		b.stopConsumerChans[queueName] <- true
 	}
-	stopChan := make(chan bool)
-	b.stopConsumerChans[queueName] = stopChan
+
+	b.consumers[queueName].LastIndex = 0
+	b.consumers[queueName].Consumers = append(b.consumers[queueName].Consumers, consumer)
+
+	var stopChan chan bool
+	if util.MapContains(b.stopConsumerChans, queueName) {
+		stopChan = b.stopConsumerChans[queueName]
+	} else {
+		stopChan = make(chan bool)
+		b.stopConsumerChans[queueName] = stopChan
+	}
 
 	go b.consumeMessage(queueName, stopChan)
 
@@ -485,6 +489,7 @@ func (b *Broker) consumeMessage(queueName string, stopChan chan bool) {
 	for {
 		select {
 		case <-stopChan:
+			log.Printf("queue %s consumer is received stop signal", queueName)
 			return
 		default:
 			message := b.queues[queueName].dequeue()
@@ -541,18 +546,22 @@ func (b *Broker) consumeMessage(queueName string, stopChan chan bool) {
 				select {
 				case consumer.MsgChan <- message:
 					log.Printf("message %s sent to consumer %s channel", message.ID, consumer.ID)
+					log.Printf("message %s is waiting for acknowdegement", message.ID)
 				default:
-					log.Printf("consumer %s message channel is closed - Retries %d", consumer.ID, consumer.Retries)
 					consumer.Retries += 1
+					log.Printf("consumer %s message channel is closed - Retries %d", consumer.ID, consumer.Retries)
 
 					if consumer.Retries >= 2 {
 						b.consumers[queueName].Consumers = util.RemoveArrayElement(b.consumers[queueName].Consumers, nextIndex)
+
+						if len(b.consumers[queueName].Consumers) == 0 {
+							log.Printf("consumer %s is stopped/crashed for queue", consumer.ID)
+							return
+						}
 					}
 				}
 
 				b.consumers[queueName].LastIndex = nextIndex
-
-				log.Printf("message %s is waiting for acknowdegement", message.ID)
 			}
 
 		}
@@ -606,7 +615,7 @@ func (b *Broker) clearUnackMessages() {
 		if err := b.saveState(); err != nil {
 			log.Printf("error saving broker state %s", err.Error())
 		}
-		time.Sleep(time.Second * 10)
+		time.Sleep(time.Second * 5)
 	}
 }
 
