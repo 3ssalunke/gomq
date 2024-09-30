@@ -31,9 +31,10 @@ type ConsumersList struct {
 type Broker struct {
 	ackTimeout        time.Duration
 	exchanges         map[string]string
+	schemaRegistry    map[string]string
 	queues            map[string]*Queue
-	pendingAcks       map[string]map[string]*PendingAck
 	bindings          map[string]map[string][]string
+	pendingAcks       map[string]map[string]*PendingAck
 	consumers         map[string]*ConsumersList
 	stopConsumerChans map[string]chan bool
 	messageRetries    map[string]int8
@@ -58,6 +59,7 @@ func NewBroker() *Broker {
 	broker := &Broker{
 		ackTimeout:        time.Second * 10,
 		exchanges:         make(map[string]string),
+		schemaRegistry:    make(map[string]string),
 		queues:            make(map[string]*Queue),
 		pendingAcks:       make(map[string]map[string]*PendingAck),
 		bindings:          make(map[string]map[string][]string),
@@ -82,7 +84,8 @@ func (b *Broker) saveMetadata() error {
 	}
 
 	metadataJson, err := json.Marshal(&BrokerMetadata{
-		QueueConfigs: queueConfigs,
+		QueueConfigs:   queueConfigs,
+		SchemaRegistry: b.schemaRegistry,
 	})
 	if err != nil {
 		return err
@@ -203,11 +206,12 @@ func (b *Broker) restoreBroker() error {
 	b.bindings = brokerState.Bindings
 	b.queues = queues
 	b.pendingAcks = pendingAcks
+	b.schemaRegistry = brokerMetadata.SchemaRegistry
 
 	return nil
 }
 
-func (b *Broker) createExchange(name, exchangeType string) error {
+func (b *Broker) createExchange(name, exchangeType, exchangeSchema string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -216,12 +220,22 @@ func (b *Broker) createExchange(name, exchangeType string) error {
 		return fmt.Errorf("exchange with the name %s already exists", name)
 	}
 
+	if err := util.ValidateProtobufSchema(exchangeSchema); err != nil {
+		log.Printf("error while validating protobuf message schema for payload %v", err)
+		return fmt.Errorf("error while validating protobuf message schema for payload %v", err)
+	}
+
 	b.exchanges[name] = exchangeType
-	if err := b.saveState(); err != nil {
-		log.Printf("error saving broker state %s, restroing broker state...", err.Error())
+	b.schemaRegistry[name] = exchangeSchema
+
+	metadataErr := b.saveMetadata()
+	stateErr := b.saveState()
+
+	if metadataErr != nil || stateErr != nil {
+		log.Printf("error saving broker metadata/state %v/%v, undoing broker state...", metadataErr, stateErr)
 
 		delete(b.exchanges, name)
-		return err
+		return fmt.Errorf("error saving broker metadata/state, operation failed")
 	}
 
 	log.Printf("exchange %s of type %s created", name, exchangeType)
@@ -238,6 +252,8 @@ func (b *Broker) removeExchange(name string) error {
 	}
 
 	exchangeType := b.exchanges[name]
+	schemaRegistry := b.schemaRegistry[name]
+
 	var bindings map[string][]string
 	var queues map[string]*Queue
 
@@ -254,16 +270,21 @@ func (b *Broker) removeExchange(name string) error {
 
 	delete(b.exchanges, name)
 	delete(b.bindings, name)
+	delete(b.schemaRegistry, name)
 
-	if err := b.saveState(); err != nil {
-		log.Printf("error saving broker state %s, restroing broker state...", err.Error())
+	metadataErr := b.saveMetadata()
+	stateErr := b.saveState()
+
+	if metadataErr != nil || stateErr != nil {
+		log.Printf("error saving broker metadata/state %v/%v, undoing broker state...", metadataErr, stateErr)
 
 		b.exchanges[name] = exchangeType
+		b.schemaRegistry[name] = schemaRegistry
 		b.bindings[name] = bindings
 		for queueName, queue := range queues {
 			b.queues[queueName] = queue
 		}
-		return err
+		return fmt.Errorf("error saving broker metadata/state, operation failed")
 	}
 
 	log.Printf("exchange %s of type %s removed", name, exchangeType)

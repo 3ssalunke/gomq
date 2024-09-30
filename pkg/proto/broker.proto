@@ -12,6 +12,7 @@ message Message {
 message Exchange {
   string name = 1;
   string type = 2;
+  string schema = 3; // protobuf message schema in string form
 }
 
 message Queue {

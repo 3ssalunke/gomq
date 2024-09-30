@@ -46,7 +46,8 @@ type BrokerState struct {
 }
 
 type BrokerMetadata struct {
-	QueueConfigs map[string]QueueConfig `json:"queue_configs"`
+	QueueConfigs   map[string]QueueConfig `json:"queue_configs"`
+	SchemaRegistry map[string]string      `json:"schema_registry"`
 }
 
 func (q *Queue) enqueue(msg *Message) {

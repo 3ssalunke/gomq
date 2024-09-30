@@ -31,13 +31,19 @@ var createExchangeCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		name, _ := cmd.Flags().GetString("exchange-name")
 		extype, _ := cmd.Flags().GetString("exchange-type")
+		schema, _ := cmd.Flags().GetString("exchange-schema")
+
 		if name == "" {
 			log.Fatal("please provide exchange name")
 		}
 		if extype == "" {
 			log.Fatal("please provide exchange type")
 		}
-		msg, err := client.CreateExchange(name, extype)
+		if schema == "" {
+			log.Fatal("please provide exchange schema")
+		}
+
+		msg, err := client.CreateExchange(name, extype, schema)
 		if err != nil {
 			log.Fatal("error while creating exchange", err.Error())
 		}
@@ -213,6 +219,7 @@ var redriveDlqMessagesCmd = &cobra.Command{
 func init() {
 	createExchangeCmd.Flags().StringP("exchange-name", "e", "", "Name of the exchange")
 	createExchangeCmd.Flags().StringP("exchange-type", "t", "", "Type of the exchange")
+	createExchangeCmd.Flags().StringP("exchange-schema", "s", "", "Schema string for exchange")
 
 	removeExchangeCmd.Flags().StringP("exchange-name", "e", "", "Name of the exchange")
 

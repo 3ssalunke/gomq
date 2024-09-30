@@ -17,12 +17,13 @@ type BrokerServiceServer struct {
 func (s *BrokerServiceServer) CreateExchange(ctx context.Context, req *protoc.Exchange) (*protoc.BrokerResponse, error) {
 	exchangeName := strings.TrimSpace(req.Name)
 	exchangeType := strings.TrimSpace(req.Type)
+	exchangeSchema := strings.TrimSpace(req.Schema)
 
-	if exchangeName == "" || exchangeType == "" {
+	if exchangeName == "" || exchangeType == "" || exchangeSchema == "" {
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	if err := s.Broker.createExchange(exchangeName, exchangeType); err != nil {
+	if err := s.Broker.createExchange(exchangeName, exchangeType, exchangeSchema); err != nil {
 		return nil, err
 	}
 
