@@ -101,3 +101,13 @@ Below are some common tasks you can perform with the GoMQ CLI:
 ```markdown
 For all commands, you can use the `--help` flag to get detailed information about the command and its usage.
 ```
+
+## Using GoMQ Client API
+
+To use the GoMQ client API in your project, follow these steps:
+
+**Install the GoMQ Client Package**:
+
+```bash
+go get your_module_path/pkg/client
+```

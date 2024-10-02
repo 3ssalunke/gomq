@@ -7,11 +7,23 @@ cli-proto-compile:
 build-broker:
 	@go build -o ./bin/broker.exe ./cmd/broker/main.go
 
+build-broker-linux:
+	@GOOS=linux GOARCH=amd64 go build -o ./bin/broker-linux ./cmd/broker/main.go
+
+build-broker-macos:
+	@GOOS=darwin GOARCH=amd64 go build -o ./bin/broker-macos ./cmd/broker/main.go
+
 run-broker-build: build-broker
 	@./bin/broker
 
 build-cli:
 	@go build -o ./bin/cli.exe ./cmd/cli/main.go
+
+build-cli-linux:
+	@GOOS=linux GOARCH=amd64 go build -o ./bin/cli-linux ./cmd/cli/main.go
+
+build-cli-macos:
+	@GOOS=darwin GOARCH=amd64 go build -o ./bin/cli-macos ./cmd/cli/main.go
 
 run-cli-build: build-cli
 	@./bin/cli
