@@ -13,7 +13,7 @@ import (
 
 type Message struct {
 	ID        string
-	Payload   string
+	Payload   []byte
 	Timestamp int64
 }
 

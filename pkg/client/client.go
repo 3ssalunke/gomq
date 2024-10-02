@@ -99,19 +99,19 @@ func BindQueue(exchangeName, queueName, routingKey string) (string, error) {
 	return res.Message, nil
 }
 
-func PublishMessage(exchangeName, routingKey, message string) (string, error) {
+func PublishMessage(exchangeName, routingKey string, message []byte) (string, error) {
 	conn, client, err := createClient()
 	if err != nil {
 		return "", err
 	}
 	defer conn.Close()
 
-	encodedMessag := &protoc.Message{
+	encodedMessage := &protoc.Message{
 		Id:        uuid.New().String(),
 		Payload:   message,
 		Timestamp: time.Now().UnixMilli(),
 	}
-	res, err := client.PublishMessage(context.TODO(), &protoc.PublishMessageRequest{Exchange: exchangeName, RoutingKey: routingKey, Message: encodedMessag})
+	res, err := client.PublishMessage(context.TODO(), &protoc.PublishMessageRequest{Exchange: exchangeName, RoutingKey: routingKey, Message: encodedMessage})
 	if err != nil {
 		return "", err
 	}

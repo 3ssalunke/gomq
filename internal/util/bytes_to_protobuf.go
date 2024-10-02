@@ -2,10 +2,8 @@ package util
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,7 +13,6 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // Function to generate Protobuf descriptor from schema string
@@ -63,48 +60,34 @@ func generateDescriptor(schema string) (*descriptorpb.FileDescriptorSet, error) 
 	return &fileDescriptorSet, nil
 }
 
-// Function to convert JSON to Protobuf message using the descriptor
-func ConvertJSONToProto(jsonString, messageName, schema string) (*anypb.Any, error) {
-	// Step 1: Generate the descriptor set from schema string
+func UnmarshalBytesToProtobuf(messageBytes []byte, exchange, schema string) error {
+	// Step 1: Generate the descriptor set from the schema string
 	fileDescriptorSet, err := generateDescriptor(schema)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate descriptor: %v", err)
+		return fmt.Errorf("failed to generate descriptor: %v", err)
 	}
 
-	// Step 2: Get the message descriptor from the descriptor set
+	// Step 2: Convert the descriptor set to a FileDescriptor
 	fileDescriptor, err := protodesc.NewFile(fileDescriptorSet.File[0], nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create file descriptor: %v", err)
+		return fmt.Errorf("failed to create file descriptor: %v", err)
 	}
 
-	name := protoreflect.Name(messageName)
-
-	// Assuming the message name is "User" (change accordingly)
-	messageDescriptor := fileDescriptor.Messages().ByName(name)
+	// Step 3: Get the message descriptor from the descriptor set
+	messageDescriptor := fileDescriptor.Messages().ByName(protoreflect.Name(exchange)) // Replace with the correct message name
 	if messageDescriptor == nil {
-		return nil, fmt.Errorf("message %s not found in schema", messageName)
+		return fmt.Errorf("message 'User' not found in schema")
 	}
 
-	// Step 3: Create a dynamic message using the message descriptor
-	log.Println("messageDescriptor--->", messageDescriptor)
+	// Step 4: Create a dynamic message using the message descriptor
 	dynamicMessage := dynamicpb.NewMessage(messageDescriptor)
 
-	// Step 4: Unmarshal the JSON into the dynamic message
-	if err := json.Unmarshal([]byte(jsonString), dynamicMessage.Interface()); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal JSON to dynamic message: %v", err)
-	}
-	log.Println("dynamicMessage--->", dynamicMessage)
-
-	// Check if the message has valid data
-	if dynamicMessage.IsValid() {
-		// Step 5: Convert the dynamic message to Protobuf Any type
-		anyMsg, err := anypb.New(dynamicMessage)
-		log.Println("anyMsg--->", anyMsg)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal to Any: %v", err)
-		}
-		return anyMsg, nil
+	// Step 5: Unmarshal the byte array into the dynamic message
+	if err := proto.Unmarshal(messageBytes, dynamicMessage); err != nil {
+		return fmt.Errorf("failed to unmarshal bytes into Protobuf message: %v", err)
 	}
 
-	return nil, fmt.Errorf("dynamic message is empty or invalid")
+	// Print the dynamic message (for demonstration)
+	fmt.Printf("Dynamic Message: %v\n", dynamicMessage)
+	return nil
 }

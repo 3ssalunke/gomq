@@ -1,13 +1,11 @@
 syntax = "proto3";
 
-import "google/protobuf/any.proto";
-
 option go_package = "./protoc";
 package gomq.broker;
 
 message Message {
   string id = 1;
-  google.protobuf.Any payload = 2; // payload of any type
+  bytes payload = 2; // payload of any type
   int64 timestamp = 3;
 }
 

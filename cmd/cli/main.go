@@ -3,8 +3,11 @@ package main
 import (
 	"log"
 
+	"github.com/3ssalunke/gomq/cmd/cli/protoc"
+	"github.com/3ssalunke/gomq/internal/util"
 	"github.com/3ssalunke/gomq/pkg/client"
 	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/proto"
 )
 
 func main() {
@@ -15,6 +18,7 @@ func main() {
 	rootCmd.AddCommand(createQueueCmd)
 	rootCmd.AddCommand(removeQueueCmd)
 	rootCmd.AddCommand(bindQueueCmd)
+	rootCmd.AddCommand(publishMessageTestCmd)
 	rootCmd.AddCommand(publishMessageCmd)
 	rootCmd.AddCommand(retrieveMessagesCmd)
 	rootCmd.AddCommand(startConsumerCmd)
@@ -137,13 +141,14 @@ var bindQueueCmd = &cobra.Command{
 	},
 }
 
-var publishMessageCmd = &cobra.Command{
-	Use:   "publish-message",
-	Short: "Publish message to exchange",
+var publishMessageTestCmd = &cobra.Command{
+	Use:   "test-publish-message",
+	Short: "Publish message to exchange test",
 	Run: func(cmd *cobra.Command, args []string) {
 		exchangeName, _ := cmd.Flags().GetString("exchange-name")
 		routingKey, _ := cmd.Flags().GetString("routing-key")
 		message, _ := cmd.Flags().GetString("message")
+
 		if exchangeName == "" {
 			log.Fatal("please provide exchange name")
 		}
@@ -151,7 +156,43 @@ var publishMessageCmd = &cobra.Command{
 			log.Fatal("please provide routing key")
 		}
 		if message == "" {
-			log.Fatal("please provide queue name")
+			log.Fatal("please provide protobuf message bytes")
+		}
+
+		person := &protoc.Person{
+			Name: message,
+			Id:   int32(util.GenerateRandomInt()),
+		}
+
+		payloadMsg, err := proto.Marshal(person)
+		if err != nil {
+			log.Fatal("something bad happened")
+		}
+
+		msg, err := client.PublishMessage(exchangeName, routingKey, payloadMsg)
+		if err != nil {
+			log.Fatal("error while publishing message", err.Error())
+		}
+		log.Println("publish-message message", msg)
+	},
+}
+
+var publishMessageCmd = &cobra.Command{
+	Use:   "publish-message",
+	Short: "Publish message to exchange",
+	Run: func(cmd *cobra.Command, args []string) {
+		exchangeName, _ := cmd.Flags().GetString("exchange-name")
+		routingKey, _ := cmd.Flags().GetString("routing-key")
+		message, _ := cmd.Flags().GetBytesBase64("message")
+
+		if exchangeName == "" {
+			log.Fatal("please provide exchange name")
+		}
+		if routingKey == "" {
+			log.Fatal("please provide routing key")
+		}
+		if message == nil {
+			log.Fatal("please provide protobuf message bytes")
 		}
 
 		msg, err := client.PublishMessage(exchangeName, routingKey, message)
@@ -234,9 +275,13 @@ func init() {
 	bindQueueCmd.Flags().StringP("queue-name", "q", "", "Name of the queue")
 	bindQueueCmd.Flags().StringP("routing-key", "k", "", "Routing key for binding")
 
+	publishMessageTestCmd.Flags().StringP("exchange-name", "e", "", "Name of the exchange")
+	publishMessageTestCmd.Flags().StringP("routing-key", "k", "", "Routing key for binding")
+	publishMessageTestCmd.Flags().StringP("message", "m", "", "Protobuf message string")
+
 	publishMessageCmd.Flags().StringP("exchange-name", "e", "", "Name of the exchange")
 	publishMessageCmd.Flags().StringP("routing-key", "k", "", "Routing key for binding")
-	publishMessageCmd.Flags().StringP("message", "m", "", "Message string")
+	publishMessageCmd.Flags().BytesBase64P("message", "m", nil, "Protobuf message bytes")
 
 	startConsumerCmd.Flags().StringP("queue-name", "q", "", "Name of the queue")
 

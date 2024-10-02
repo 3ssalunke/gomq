@@ -1,6 +1,9 @@
 proto-compile:
 	@protoc --go_out=./pkg --go-grpc_out=./pkg ./pkg/proto/*.proto
 
+cli-proto-compile:
+	@protoc --go_out=./cmd/cli --go-grpc_out=./cmd/cli ./cmd/cli/proto/*.proto
+
 build-broker:
 	@go build -o ./bin/broker.exe ./cmd/broker/main.go
 

@@ -1,6 +1,7 @@
 package util
 
 import (
+	"math/rand"
 	"strings"
 	"unicode"
 )
@@ -32,4 +33,8 @@ func RemoveAllWhiteSpaces(s string) string {
 
 func RemoveArrayElement[T comparable](s []T, index int) []T {
 	return append(s[:index], s[index+1:]...)
+}
+
+func GenerateRandomInt() int {
+	return rand.Intn(100)
 }

@@ -405,6 +405,11 @@ func (b *Broker) publishMessage(exchange, routingKey string, msg *Message) error
 		return fmt.Errorf("no bindings exist for exchange %s", exchange)
 	}
 
+	if err := util.UnmarshalBytesToProtobuf(msg.Payload, exchange, b.schemaRegistry[exchange]); err != nil {
+		log.Println("error while unmarshaling message payload bytes to protobuf message: ", err.Error())
+		return fmt.Errorf("error while unmarshaling message payload bytes to protobuf message: %s", err.Error())
+	}
+
 	for queue, keys := range b.bindings[exchange] {
 		for _, key := range keys {
 			if key == routingKey {
