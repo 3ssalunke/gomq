@@ -109,5 +109,5 @@ To use the GoMQ client API in your project, follow these steps:
 **Install the GoMQ Client Package**:
 
 ```bash
-go get your_module_path/pkg/client
+go get github.com/3ssalunke/gomq/pkg/client
 ```
