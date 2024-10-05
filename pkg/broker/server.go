@@ -205,3 +205,21 @@ func (s *BrokerServiceServer) RedriveDlqMessages(ctx context.Context, req *proto
 		Message: fmt.Sprintf("Messages redrived to %s", queueName),
 	}, nil
 }
+
+func (s *BrokerServiceServer) GetExchangeSchema(ctx context.Context, req *protoc.GetExchangeSchemaRequest) (*protoc.GetExchangeSchemaResponse, error) {
+	exchangeName := strings.TrimSpace(req.ExchangeName)
+	if exchangeName == "" {
+		return nil, fmt.Errorf("invalid request arguments")
+	}
+
+	schema, err := s.Broker.GetExchangeSchema(exchangeName)
+	if err != nil {
+		return nil, err
+	}
+
+	return &protoc.GetExchangeSchemaResponse{
+		Status:  true,
+		Message: fmt.Sprintf("schema for exchange %s retrieved", exchangeName),
+		Schema:  schema,
+	}, nil
+}

@@ -676,3 +676,12 @@ func (b *Broker) redriveDlqMessages(queueName string) error {
 
 	return nil
 }
+
+func (b *Broker) GetExchangeSchema(exchangeName string) (string, error) {
+	if !util.MapContains(b.schemaRegistry, exchangeName) {
+		log.Printf("exchange %s does not exist", exchangeName)
+		return "", fmt.Errorf("exchange %s does not exist", exchangeName)
+	}
+
+	return b.schemaRegistry[exchangeName], nil
+}

@@ -3,7 +3,6 @@ package util
 import (
 	"testing"
 
-	"github.com/3ssalunke/gomq/cmd/cli/protoc"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
@@ -19,7 +18,7 @@ func TestGenerateDescriptor_ValidSchema(t *testing.T) {
 	`
 
 	// Call the function
-	descriptor, err := generateDescriptor(schema)
+	descriptor, err := generateDescriptor(schema, "")
 
 	// Assertions
 	require.NoError(t, err, "Expected no error for valid schema")
@@ -37,7 +36,7 @@ func TestGenerateDescriptor_InvalidSchema(t *testing.T) {
 	`
 
 	// Call the function
-	_, err := generateDescriptor(schema)
+	_, err := generateDescriptor(schema, "")
 
 	// Assertions
 	require.Error(t, err, "Expected error for invalid schema")
@@ -55,7 +54,7 @@ func TestUnmarshalBytesToProtobuf_ValidMessage(t *testing.T) {
 	`
 
 	// Create a valid Protobuf message (User)
-	user := &protoc.Person{
+	user := &Person{
 		Name:  "Alice",
 		Id:    int32(GenerateRandomInt()),
 		Email: "Alice@test.com",

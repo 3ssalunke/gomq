@@ -63,6 +63,16 @@ message RemoveQueueRequest {
   string exchange_name = 2;
 }
 
+message GetExchangeSchemaRequest {
+  string exchange_name = 1;
+}
+
+message GetExchangeSchemaResponse{
+  bool status = 1;
+  string message = 2;
+  string schema = 3;
+}
+
 service BrokerService {
   rpc CreateExchange(Exchange) returns (BrokerResponse);
   rpc RemoveExchange(RemoveExchangeRequest) returns (BrokerResponse);
@@ -70,8 +80,9 @@ service BrokerService {
   rpc RemoveQueue(RemoveQueueRequest) returns (BrokerResponse);
   rpc BindQueue(Binding) returns (BrokerResponse);
   rpc PublishMessage(PublishMessageRequest) returns (BrokerResponse);
-  rpc RetrieveMessages(RetrieveMessagesRequest) returns  (RetrieveMessagesResponse);
+  rpc RetrieveMessages(RetrieveMessagesRequest) returns (RetrieveMessagesResponse);
   rpc ConsumeMessages(Queue) returns (stream Message);
   rpc MessageAcknowledge(MessageAckRequest) returns (BrokerResponse);
   rpc RedriveDlqMessages(Queue) returns (BrokerResponse);
+  rpc GetExchangeSchema(GetExchangeSchemaRequest) returns (GetExchangeSchemaResponse);
 }

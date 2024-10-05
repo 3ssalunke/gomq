@@ -33,3 +33,6 @@ run-broker:
 
 run-cli:
 	@go run ./cmd/cli/main.go
+
+run-tests:
+	@go test -v ./...
