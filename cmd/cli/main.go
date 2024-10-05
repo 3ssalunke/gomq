@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 
+	"github.com/3ssalunke/gomq/internal/util"
 	"github.com/3ssalunke/gomq/pkg/client"
 	"github.com/spf13/cobra"
 )
@@ -15,8 +16,10 @@ func main() {
 	rootCmd.AddCommand(createQueueCmd)
 	rootCmd.AddCommand(removeQueueCmd)
 	rootCmd.AddCommand(bindQueueCmd)
+	rootCmd.AddCommand(cliPublishMessageCmd)
 	rootCmd.AddCommand(publishMessageCmd)
 	rootCmd.AddCommand(retrieveMessagesCmd)
+	rootCmd.AddCommand(startCliConsumerCmd)
 	rootCmd.AddCommand(startConsumerCmd)
 	rootCmd.AddCommand(redriveDlqMessagesCmd)
 
@@ -137,7 +140,7 @@ var bindQueueCmd = &cobra.Command{
 	},
 }
 
-var publishMessageCmd = &cobra.Command{
+var cliPublishMessageCmd = &cobra.Command{
 	Use:   "publish-message",
 	Short: "Publish message to exchange",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -158,6 +161,38 @@ var publishMessageCmd = &cobra.Command{
 		msg, err := client.CliPublishMessage(exchangeName, routingKey, message)
 		if err != nil {
 			log.Fatal("error while publishing message", err.Error())
+		}
+		log.Println("publish-message message", msg)
+	},
+}
+
+var publishMessageCmd = &cobra.Command{
+	Use:   "test-publish-message",
+	Short: "Publish message to exchange (test)",
+	Run: func(cmd *cobra.Command, args []string) {
+		exchangeName, _ := cmd.Flags().GetString("exchange-name")
+		routingKey, _ := cmd.Flags().GetString("routing-key")
+
+		if exchangeName == "" {
+			log.Fatal("please provide exchange name")
+		}
+		if routingKey == "" {
+			log.Fatal("please provide routing key")
+		}
+
+		message := struct {
+			Name  string
+			Id    int32
+			Email string
+		}{
+			Name:  "test",
+			Id:    int32(util.GenerateRandomInt()),
+			Email: "test@test.com",
+		}
+
+		msg, err := client.PublishMessage(exchangeName, routingKey, message)
+		if err != nil {
+			log.Fatal("error while publishing message ", err.Error())
 		}
 		log.Println("publish-message message", msg)
 	},
@@ -184,7 +219,7 @@ var retrieveMessagesCmd = &cobra.Command{
 	},
 }
 
-var startConsumerCmd = &cobra.Command{
+var startCliConsumerCmd = &cobra.Command{
 	Use:   "start-consumer",
 	Short: "Start queue consumer",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -193,11 +228,34 @@ var startConsumerCmd = &cobra.Command{
 			log.Fatal("please provide queue name")
 		}
 
-		msg, err := client.CliStartConsumer(queueName)
-		if err != nil {
+		if err := client.CliStartConsumer(queueName); err != nil {
 			log.Fatal("error while consuming queue messages: ", err.Error())
 		}
-		log.Println("messages redrived", msg)
+	},
+}
+
+var startConsumerCmd = &cobra.Command{
+	Use:   "test-start-consumer",
+	Short: "Start queue consumer (test)",
+	Run: func(cmd *cobra.Command, args []string) {
+		queueName, _ := cmd.Flags().GetString("queue-name")
+		exchangeName, _ := cmd.Flags().GetString("exchange-name")
+		if queueName == "" {
+			log.Fatal("please provide queue name")
+		}
+		if exchangeName == "" {
+			log.Fatal("please provide exchange name")
+		}
+
+		var message struct {
+			Name  string
+			Id    int32
+			Email string
+		}
+
+		if err := client.StartConsumer(exchangeName, queueName, &message); err != nil {
+			log.Fatal("error while consuming queue messages: ", err.Error())
+		}
 	},
 }
 
@@ -235,10 +293,16 @@ func init() {
 	bindQueueCmd.Flags().StringP("queue-name", "q", "", "Name of the queue")
 	bindQueueCmd.Flags().StringP("routing-key", "k", "", "Routing key for binding")
 
+	cliPublishMessageCmd.Flags().StringP("exchange-name", "e", "", "Name of the exchange")
+	cliPublishMessageCmd.Flags().StringP("routing-key", "k", "", "Routing key for binding")
+	cliPublishMessageCmd.Flags().BytesBase64P("message", "m", nil, "Protobuf message bytes")
+
 	publishMessageCmd.Flags().StringP("exchange-name", "e", "", "Name of the exchange")
 	publishMessageCmd.Flags().StringP("routing-key", "k", "", "Routing key for binding")
-	publishMessageCmd.Flags().BytesBase64P("message", "m", nil, "Protobuf message bytes")
 
+	startCliConsumerCmd.Flags().StringP("queue-name", "q", "", "Name of the queue")
+
+	startConsumerCmd.Flags().StringP("exchange-name", "e", "", "Name of the exchange")
 	startConsumerCmd.Flags().StringP("queue-name", "q", "", "Name of the queue")
 
 	retrieveMessagesCmd.Flags().StringP("queue-name", "q", "", "Name of the queue")

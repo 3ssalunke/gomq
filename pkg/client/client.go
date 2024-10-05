@@ -125,7 +125,7 @@ func CliPublishMessage(exchangeName, routingKey string, message []byte) (string,
 	return res.Message, nil
 }
 
-func PublishMessage(exchangeName, routingKey string, message any) (string, error) {
+func PublishMessage(exchangeName, routingKey string, message interface{}) (string, error) {
 	conn, client, err := createClient()
 	if err != nil {
 		return "", err
@@ -214,10 +214,10 @@ func RetrieveMessages(queueName string, count int32) (string, error) {
 	return res.Message, nil
 }
 
-func CliStartConsumer(queueName string) (string, error) {
+func CliStartConsumer(queueName string) error {
 	conn, client, err := createClient()
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer conn.Close()
 
@@ -226,7 +226,7 @@ func CliStartConsumer(queueName string) (string, error) {
 
 	stream, err := client.ConsumeMessages(ctx, &protoc.Queue{Name: queueName})
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	streamRetries := 0
@@ -244,7 +244,7 @@ func CliStartConsumer(queueName string) (string, error) {
 		if err != nil {
 			if status.Code(err) == codes.Unavailable {
 				if connectionRetries > 3 {
-					return "", fmt.Errorf("broker crashed")
+					return fmt.Errorf("broker crashed")
 				}
 
 				connectionRetries++
@@ -257,7 +257,7 @@ func CliStartConsumer(queueName string) (string, error) {
 			}
 
 			if streamRetries > 3 {
-				return "", fmt.Errorf("broker stream crashed")
+				return fmt.Errorf("broker stream crashed")
 			}
 			streamRetries++
 			time.Sleep(time.Second * time.Duration(streamBackoffWaitTime))
@@ -274,6 +274,121 @@ func CliStartConsumer(queueName string) (string, error) {
 
 		client.MessageAcknowledge(ctx, &protoc.MessageAckRequest{Queue: queueName, MesssageId: msg.Id})
 		log.Println(msg.Payload)
+	}
+}
+
+func StartConsumer(exchangeName, queueName string, message interface{}) error {
+	conn, client, err := createClient()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	stream, err := client.ConsumeMessages(ctx, &protoc.Queue{Name: queueName})
+	if err != nil {
+		return err
+	}
+
+	streamRetries := 0
+	connectionRetries := 0
+	streamBackoffWaitTime := 5
+	connectionBackoffWaitTime := 5
+
+	for {
+		var msg *protoc.Message
+
+		if stream != nil {
+			msg, err = stream.Recv()
+		}
+
+		if err != nil {
+			if status.Code(err) == codes.Unavailable {
+				if connectionRetries > 3 {
+					return fmt.Errorf("broker crashed")
+				}
+
+				connectionRetries++
+				time.Sleep(time.Second * time.Duration(connectionBackoffWaitTime))
+				connectionBackoffWaitTime = connectionBackoffWaitTime * 2
+
+				stream, err = client.ConsumeMessages(ctx, &protoc.Queue{Name: queueName})
+				continue
+
+			}
+
+			if streamRetries > 3 {
+				return fmt.Errorf("broker stream crashed")
+			}
+			streamRetries++
+			time.Sleep(time.Second * time.Duration(streamBackoffWaitTime))
+			streamBackoffWaitTime = streamBackoffWaitTime * 2
+			continue
+		}
+
+		if streamRetries > 0 {
+			streamRetries = 0
+		}
+		if connectionRetries > 0 {
+			connectionRetries = 0
+		}
+
+		client.MessageAcknowledge(ctx, &protoc.MessageAckRequest{Queue: queueName, MesssageId: msg.Id})
+
+		protoFileName := strings.ToLower(exchangeName) + ".proto"
+
+		fd, err := protoregistry.GlobalFiles.FindFileByPath(protoFileName)
+		if err != nil {
+			log.Printf("error finding registered %s file: %v\n", protoFileName, err)
+
+			res, err := client.GetExchangeSchema(context.TODO(), &protoc.GetExchangeSchemaRequest{ExchangeName: exchangeName})
+			if err != nil {
+				return err
+			}
+			schema := res.Schema
+
+			if err := util.RegisterDescriptorInRegistry(schema, strings.ToLower(exchangeName)); err != nil {
+				log.Printf("error registering descriptor: %v\n", err)
+				return err
+			}
+
+			fd, err = protoregistry.GlobalFiles.FindFileByPath(protoFileName)
+			if err != nil {
+				log.Printf("error finding registered %s: %v\n", protoFileName, err)
+				return err
+			}
+		}
+
+		messageDescriptor := fd.Messages().ByName(protoreflect.Name(exchangeName))
+		if messageDescriptor == nil {
+			log.Printf("message %s does not found in descriptor", exchangeName)
+			return fmt.Errorf("message %s does not found in descriptor", exchangeName)
+		}
+
+		dynamicMessage := dynamicpb.NewMessage(messageDescriptor)
+
+		if err := proto.Unmarshal(msg.Payload, dynamicMessage); err != nil {
+			return fmt.Errorf("failed to unmarshal protobuf data: %v", err)
+		}
+
+		v := reflect.ValueOf(message).Elem()
+		for i := 0; i < v.NumField(); i++ {
+			fieldName := v.Type().Field(i).Name
+
+			protoFieldName := strings.ToLower(fieldName)
+
+			fieldDescriptor := messageDescriptor.Fields().ByName(protoreflect.Name(protoFieldName))
+			if fieldDescriptor == nil {
+				return fmt.Errorf("field '%s' not found in message descriptor", fieldName)
+			}
+
+			value := dynamicMessage.Get(fieldDescriptor).Interface()
+			v.Field(i).Set(reflect.ValueOf(value))
+		}
+
+		log.Println(message)
 	}
 }
 
