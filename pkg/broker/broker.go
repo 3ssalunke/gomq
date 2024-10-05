@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/3ssalunke/gomq/internal/config"
 	"github.com/3ssalunke/gomq/internal/util"
 	"github.com/google/uuid"
 )
@@ -20,7 +21,7 @@ const (
 type Consumer struct {
 	ID      string
 	MsgChan chan *Message
-	Retries int
+	Retries uint8
 }
 
 type ConsumersList struct {
@@ -29,27 +30,34 @@ type ConsumersList struct {
 }
 
 type Broker struct {
-	ackTimeout        time.Duration
-	exchanges         map[string]string
-	schemaRegistry    map[string]string
-	queues            map[string]*Queue
-	bindings          map[string]map[string][]string
-	pendingAcks       map[string]map[string]*PendingAck
+	config config.Config
+
+	ackTimeout time.Duration
+
+	exchanges      map[string]string
+	schemaRegistry map[string]string
+	queues         map[string]*Queue
+	bindings       map[string]map[string][]string
+
+	pendingAcks map[string]map[string]*PendingAck
+
 	consumers         map[string]*ConsumersList
 	stopConsumerChans map[string]chan bool
-	messageRetries    map[string]int8
-	fileStorage       *FileStorage
+
+	messageRetries map[string]int8
+
+	fileStorage *FileStorage
 
 	mu sync.Mutex
 }
 
-func NewBroker() *Broker {
+func NewBroker(config config.Config) *Broker {
 	cwd, err := os.Getwd()
 	if err != nil {
 		log.Fatal("error getting cwd", err)
 	}
-	statePath := filepath.Join(cwd, "store", "state")
-	messagesPath := filepath.Join(cwd, "store", "messages")
+	statePath := filepath.Join(cwd, config.BrokerStoreDir, config.BrokerStateDir)
+	messagesPath := filepath.Join(cwd, config.BrokerStoreDir, config.BrokerMessagesDir)
 
 	fileStorage, err := newFileStorage(statePath, messagesPath)
 	if err != nil {
@@ -57,7 +65,8 @@ func NewBroker() *Broker {
 	}
 
 	broker := &Broker{
-		ackTimeout:        time.Second * 10,
+		config:            config,
+		ackTimeout:        time.Second * time.Duration(config.MessageAckTimeout),
 		exchanges:         make(map[string]string),
 		schemaRegistry:    make(map[string]string),
 		queues:            make(map[string]*Queue),
@@ -72,7 +81,7 @@ func NewBroker() *Broker {
 	if err := broker.restoreBroker(); err != nil {
 		log.Fatal("error restoring broker state on startup", err.Error())
 	}
-	go broker.clearUnackMessages()
+	go broker.clearNackMessages()
 
 	return broker
 }
@@ -574,10 +583,7 @@ func (b *Broker) consumeMessage(queueName string, stopChan chan bool) {
 					log.Printf("message %s sent to consumer %s channel", message.ID, consumer.ID)
 					log.Printf("message %s is waiting for acknowdegement", message.ID)
 				default:
-					consumer.Retries += 1
-					log.Printf("consumer %s message channel is closed - Retries %d", consumer.ID, consumer.Retries)
-
-					if consumer.Retries >= 2 {
+					if consumer.Retries >= uint8(b.config.ConsumerConnectionRetries) {
 						b.consumers[queueName].Consumers = util.RemoveArrayElement(b.consumers[queueName].Consumers, nextIndex)
 
 						if len(b.consumers[queueName].Consumers) == 0 {
@@ -585,6 +591,9 @@ func (b *Broker) consumeMessage(queueName string, stopChan chan bool) {
 							return
 						}
 					}
+
+					consumer.Retries += 1
+					log.Printf("consumer %s message channel is closed - Retries %d", consumer.ID, consumer.Retries)
 				}
 
 				b.consumers[queueName].LastIndex = nextIndex
@@ -625,9 +634,9 @@ func (b *Broker) messageAcknowledge(queueName, msgID string) error {
 	return nil
 }
 
-func (b *Broker) clearUnackMessages() {
+func (b *Broker) clearNackMessages() {
 	for {
-		log.Printf("clearing unacknowledged messages...")
+		log.Printf("clearing not acknowledged messages...")
 		for queueName, messages := range b.pendingAcks {
 			for messageID, pending := range messages {
 				if time.Since(pending.TimeSent) > b.ackTimeout {
@@ -641,7 +650,7 @@ func (b *Broker) clearUnackMessages() {
 		if err := b.saveState(); err != nil {
 			log.Printf("error saving broker state %s", err.Error())
 		}
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * time.Duration(b.config.MessageNackClearInterval))
 	}
 }
 

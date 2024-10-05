@@ -1,4 +1,6 @@
 bin
 store
 
+.env
+
 *.txt
