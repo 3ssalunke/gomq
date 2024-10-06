@@ -1,13 +1,15 @@
 # GoMQ - A Golang Message Queue with Protobuf Support
 
-GoMQ is a lightweight, custom message queue playground built in Golang, offering native Protobuf support for structured message serialization. It includes a **broker server** for managing exchanges, queues, message publishing and delivering, as well as a **CLI** for interacting with the message broker.
+GoMQ is a lightweight, custom message queue built in Golang, offering native Protobuf support for structured message serialization. It includes a **broker server** for managing exchanges, queues, message publishing and delivering, as well as a **CLI** for interacting with the message broker.
+
+This repository also includes a go client API which can be used to interact with broker and perform all the broker operations.
 
 This README provides instructions to set up the broker server and use the CLI for common tasks like creating exchanges, queues, bindings, publishing messages and setting up consumers for the queues.
 
 ## Features
 
 - Message Broker with exchanges, queues and bindings
-- Native Protobuf support for message serialization (TODO)
+- Native Protobuf support for message serialization
 - Consumer Groups for load balancing
 - Dead Letter Queue (DLQ) support
 - Message Acknowledgment and Re-delivery
@@ -17,90 +19,79 @@ This README provides instructions to set up the broker server and use the CLI fo
 
 - Golang (version 1.x or higher)
 
-## Installation
+## Downloading Binaries
 
-### Clone the Repository
+GoMQ provides pre-built binaries for the broker server and CLI. You can download them from the [Releases](https://github.com/3ssalunke/gomq/releases) page.
 
-```bash
-git clone https://github.com/3ssalunke/gomq.git
-cd gomq
-```
+### Download and Install
 
-### Install Dependencies
+1. **Download the appropriate binary** for your operating system:
 
-```bash
-go mod tidy
-```
+   - For Linux, download `broker-linux` and `cli-linux`.
+   - For Windows, download `broker.exe` and `cli.exe`.
+   - For Mac, download `broker-darwin` and `cli-darwin`.
 
-### Running the Broker Server
+2. **Extract the downloaded files** (if necessary) and place them in a directory included in your system's `PATH`, or run them from the downloaded location.
 
-#### Step 1: Compile the Broker Server
+## Running the Broker Server
 
-```bash
-go build -o ./bin/broker.exe ./cmd/broker/main.go
-```
+### Step 1: Run the Broker Server
 
-#### Step 2: Run the Broker Server
+Navigate to the directory where the `broker` binary is located and run:
 
 ```bash
-./bin/broker
+./broker
 ```
 
-By default, the server listens on localhost:50051 for incoming gRPC connections.
+By default, the server listens on localhost:50051 for incoming gRPC connections. For changing the default settings of broker, please source environment variables listed in **.env.broker.example**.
 
 ## Using the CLI
-
-The GoMQ CLI provides an interface for interacting with the broker, allowing you to create exchanges, queues, bindings, publish messages and setup consumers.
-
-### Step 1: Compile the CLI
-
-```bash
-go build -o ./bin/cli.exe ./cmd/cli/main.go
-```
-
-### Step 2: CLI Usage
 
 Below are some common tasks you can perform with the GoMQ CLI:
 
 #### Create an Exchange
 
+Navigate to the directory where the `cli` binary is located and run:
+
 ```bash
-./bin/cli create-exchange -e <exchange-name> -t <exchange-type>
+./cli create-exchange -e <exchange-name> -t <exchange-type>
 ```
 
 #### Create an Queue
 
 ```bash
-./bin/cli create-queue -q <queue-name> -d true -m 5
+./cli create-queue -q <queue-name> -d true -m 5
 ```
 
 #### Bind a queue
 
 ```bash
-./bin/cli bind-queue -e <exchange-name> -q <queue-name> -k <routing-key>
+./cli bind-queue -e <exchange-name> -q <queue-name> -k <routing-key>
 ```
 
 #### Publish a message
 
 ```bash
-./bin/cli publish-message -e <exchange-name> -k <routing-key> -m <json-payload>
+./cli publish-message -e <exchange-name> -k <routing-key> -m <json-payload>
 ```
 
 #### Start a consumer
 
 ```bash
-./bin/cli start-consumer -q <queue-name>
+./cli start-consumer -q <queue-name>
 ```
 
 #### Redrive messages to main queue
 
 ```bash
-./bin/cli redrive-messages -q <queue-name>
+./cli redrive-messages -q <queue-name>
 ```
 
 ```markdown
 For all commands, you can use the `--help` flag to get detailed information about the command and its usage.
 ```
+
+For changing the default settings of client cli, please source environment variables listed in **.env.client.example**.
 
 ## Using GoMQ Client API
 
@@ -109,5 +100,5 @@ To use the GoMQ client API in your project, follow these steps:
 **Install the GoMQ Client Package**:
 
 ```bash
-go get github.com/3ssalunke/gomq/pkg/client
+go get github.com/3ssalunke/gomq/client
 ```
