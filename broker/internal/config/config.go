@@ -33,7 +33,7 @@ func LoadConfig() Config {
 
 	viper.SetDefault("CONSUMER_CONNECTION_RETRIES", 3)
 
-	viper.SetConfigFile(".env")
+	viper.SetConfigFile(".env.broker")
 	viper.SetConfigType("env")
 	err := viper.ReadInConfig()
 	if err != nil {

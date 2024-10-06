@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/3ssalunke/gomq/client/internal/config"
 	"github.com/3ssalunke/gomq/shared/pkg/protoc"
 	"github.com/3ssalunke/gomq/shared/util"
 	"github.com/google/uuid"
@@ -21,8 +22,18 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
-func createClient() (*grpc.ClientConn, protoc.BrokerServiceClient, error) {
-	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+type MQClient struct {
+	Config config.Config
+}
+
+func NewMQClient(config config.Config) *MQClient {
+	return &MQClient{
+		Config: config,
+	}
+}
+
+func (c *MQClient) createClient() (*grpc.ClientConn, protoc.BrokerServiceClient, error) {
+	conn, err := grpc.NewClient(c.Config.BrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -30,8 +41,8 @@ func createClient() (*grpc.ClientConn, protoc.BrokerServiceClient, error) {
 	return conn, protoc.NewBrokerServiceClient(conn), nil
 }
 
-func CreateExchange(name, extype, schema string) (string, error) {
-	conn, client, err := createClient()
+func (c *MQClient) CreateExchange(name, extype, schema string) (string, error) {
+	conn, client, err := c.createClient()
 	if err != nil {
 		return "", err
 	}
@@ -44,8 +55,8 @@ func CreateExchange(name, extype, schema string) (string, error) {
 	return res.Message, nil
 }
 
-func RemoveExchange(name string) (string, error) {
-	conn, client, err := createClient()
+func (c *MQClient) RemoveExchange(name string) (string, error) {
+	conn, client, err := c.createClient()
 	if err != nil {
 		return "", err
 	}
@@ -58,8 +69,8 @@ func RemoveExchange(name string) (string, error) {
 	return res.Message, nil
 }
 
-func CreateQueue(name string, dlq bool, maxRetries int8) (string, error) {
-	conn, client, err := createClient()
+func (c *MQClient) CreateQueue(name string, dlq bool, maxRetries int8) (string, error) {
+	conn, client, err := c.createClient()
 	if err != nil {
 		return "", err
 	}
@@ -78,8 +89,8 @@ func CreateQueue(name string, dlq bool, maxRetries int8) (string, error) {
 	return res.Message, nil
 }
 
-func RemoveQueue(exchangeName, queueName string) (string, error) {
-	conn, client, err := createClient()
+func (c *MQClient) RemoveQueue(exchangeName, queueName string) (string, error) {
+	conn, client, err := c.createClient()
 	if err != nil {
 		return "", err
 	}
@@ -92,8 +103,8 @@ func RemoveQueue(exchangeName, queueName string) (string, error) {
 	return res.Message, nil
 }
 
-func BindQueue(exchangeName, queueName, routingKey string) (string, error) {
-	conn, client, err := createClient()
+func (c *MQClient) BindQueue(exchangeName, queueName, routingKey string) (string, error) {
+	conn, client, err := c.createClient()
 	if err != nil {
 		return "", err
 	}
@@ -106,8 +117,8 @@ func BindQueue(exchangeName, queueName, routingKey string) (string, error) {
 	return res.Message, nil
 }
 
-func CliPublishMessage(exchangeName, routingKey string, message []byte) (string, error) {
-	conn, client, err := createClient()
+func (c *MQClient) CliPublishMessage(exchangeName, routingKey string, message []byte) (string, error) {
+	conn, client, err := c.createClient()
 	if err != nil {
 		return "", err
 	}
@@ -125,8 +136,8 @@ func CliPublishMessage(exchangeName, routingKey string, message []byte) (string,
 	return res.Message, nil
 }
 
-func PublishMessage(exchangeName, routingKey string, message interface{}) (string, error) {
-	conn, client, err := createClient()
+func (c *MQClient) PublishMessage(exchangeName, routingKey string, message interface{}) (string, error) {
+	conn, client, err := c.createClient()
 	if err != nil {
 		return "", err
 	}
@@ -197,8 +208,8 @@ func PublishMessage(exchangeName, routingKey string, message interface{}) (strin
 	return res.Message, nil
 }
 
-func RetrieveMessages(queueName string, count int32) (string, error) {
-	conn, client, err := createClient()
+func (c *MQClient) RetrieveMessages(queueName string, count int32) (string, error) {
+	conn, client, err := c.createClient()
 	if err != nil {
 		return "", err
 	}
@@ -214,8 +225,8 @@ func RetrieveMessages(queueName string, count int32) (string, error) {
 	return res.Message, nil
 }
 
-func CliStartConsumer(queueName string) error {
-	conn, client, err := createClient()
+func (c *MQClient) CliStartConsumer(queueName string) error {
+	conn, client, err := c.createClient()
 	if err != nil {
 		return err
 	}
@@ -229,10 +240,10 @@ func CliStartConsumer(queueName string) error {
 		return err
 	}
 
-	streamRetries := 0
-	connectionRetries := 0
-	streamBackoffWaitTime := 5
-	connectionBackoffWaitTime := 5
+	streamRetries := uint16(0)
+	connectionRetries := uint16(0)
+	streamBackoffWaitTime := c.Config.StreamBackoffWaittime
+	connectionBackoffWaitTime := c.Config.ConnectionBackoffWaittime
 
 	for {
 		var msg *protoc.Message
@@ -243,7 +254,7 @@ func CliStartConsumer(queueName string) error {
 
 		if err != nil {
 			if status.Code(err) == codes.Unavailable {
-				if connectionRetries > 3 {
+				if connectionRetries > c.Config.MaxConnectionRetries {
 					return fmt.Errorf("broker crashed")
 				}
 
@@ -256,7 +267,7 @@ func CliStartConsumer(queueName string) error {
 
 			}
 
-			if streamRetries > 3 {
+			if streamRetries > c.Config.MaxStreamRetries {
 				return fmt.Errorf("broker stream crashed")
 			}
 			streamRetries++
@@ -277,8 +288,8 @@ func CliStartConsumer(queueName string) error {
 	}
 }
 
-func StartConsumer(exchangeName, queueName string, message interface{}) error {
-	conn, client, err := createClient()
+func (c *MQClient) StartConsumer(exchangeName, queueName string, message interface{}) error {
+	conn, client, err := c.createClient()
 	if err != nil {
 		return err
 	}
@@ -292,10 +303,10 @@ func StartConsumer(exchangeName, queueName string, message interface{}) error {
 		return err
 	}
 
-	streamRetries := 0
-	connectionRetries := 0
-	streamBackoffWaitTime := 5
-	connectionBackoffWaitTime := 5
+	streamRetries := uint16(0)
+	connectionRetries := uint16(0)
+	streamBackoffWaitTime := c.Config.StreamBackoffWaittime
+	connectionBackoffWaitTime := c.Config.ConnectionBackoffWaittime
 
 	for {
 		var msg *protoc.Message
@@ -306,7 +317,7 @@ func StartConsumer(exchangeName, queueName string, message interface{}) error {
 
 		if err != nil {
 			if status.Code(err) == codes.Unavailable {
-				if connectionRetries > 3 {
+				if connectionRetries > c.Config.MaxConnectionRetries {
 					return fmt.Errorf("broker crashed")
 				}
 
@@ -319,7 +330,7 @@ func StartConsumer(exchangeName, queueName string, message interface{}) error {
 
 			}
 
-			if streamRetries > 3 {
+			if streamRetries > c.Config.MaxStreamRetries {
 				return fmt.Errorf("broker stream crashed")
 			}
 			streamRetries++
@@ -392,8 +403,8 @@ func StartConsumer(exchangeName, queueName string, message interface{}) error {
 	}
 }
 
-func RedriveDlqMessages(queueName string) (string, error) {
-	conn, client, err := createClient()
+func (c *MQClient) RedriveDlqMessages(queueName string) (string, error) {
+	conn, client, err := c.createClient()
 	if err != nil {
 		return "", err
 	}
