@@ -1,38 +1,13 @@
-package broker
+package storage
 
 import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
-	"sync"
-	"time"
 )
 
-type Message struct {
-	ID        string
-	Payload   []byte
-	Timestamp int64
-}
-
-type QueueConfig struct {
-	DLQ        bool
-	MaxRetries int8
-}
-
-type Queue struct {
-	Name     string
-	Config   QueueConfig
-	Messages []*Message
-	Mutex    sync.Mutex
-}
-
-type PendingAck struct {
-	Message  *Message
-	TimeSent time.Time
-}
 type FileStorage struct {
 	MessagesPath string
 	StatePath    string
@@ -50,40 +25,7 @@ type BrokerMetadata struct {
 	SchemaRegistry map[string]string      `json:"schema_registry"`
 }
 
-func (q *Queue) enqueue(msg *Message) {
-	q.Mutex.Lock()
-	defer q.Mutex.Unlock()
-	q.Messages = append(q.Messages, msg)
-	log.Println(msg.ID, "message enqueued")
-}
-
-func (q *Queue) dequeue() *Message {
-	q.Mutex.Lock()
-	defer q.Mutex.Unlock()
-
-	if len(q.Messages) == 0 {
-		return nil
-	}
-
-	msg := q.Messages[0]
-	q.Messages = q.Messages[1:]
-	log.Println(msg.ID, "message dequeued")
-	return msg
-}
-
-func (q *Queue) peek(n int) []*Message {
-	if n > len(q.Messages) {
-		n = len(q.Messages)
-	}
-
-	return q.Messages[:n]
-}
-
-func (q *Queue) size() int {
-	return len(q.Messages)
-}
-
-func newFileStorage(statePath, messagesPath string) (*FileStorage, error) {
+func NewFileStorage(statePath, messagesPath string) (*FileStorage, error) {
 	_, err := os.Stat(statePath)
 	if os.IsNotExist(err) {
 		if err := os.MkdirAll(statePath, os.ModePerm); err != nil {
@@ -108,12 +50,12 @@ func newFileStorage(statePath, messagesPath string) (*FileStorage, error) {
 	}, nil
 }
 
-func (f *FileStorage) storeBrokerMetadata(metadata []byte) error {
+func (f *FileStorage) StoreBrokerMetadata(metadata []byte) error {
 	path := filepath.Join(f.StatePath, fmt.Sprintf("%s.json", "metadata"))
 	return os.WriteFile(path, metadata, 0644)
 }
 
-func (f *FileStorage) getBrokerMetadata() (*BrokerMetadata, error) {
+func (f *FileStorage) GetBrokerMetadata() (*BrokerMetadata, error) {
 	path := filepath.Join(f.StatePath, fmt.Sprintf("%s.json", "metadata"))
 
 	_, err := os.Stat(path)
@@ -141,12 +83,12 @@ func (f *FileStorage) getBrokerMetadata() (*BrokerMetadata, error) {
 	return brokerMetadata, nil
 }
 
-func (f *FileStorage) storeBrokerState(brokerState []byte) error {
+func (f *FileStorage) StoreBrokerState(brokerState []byte) error {
 	path := filepath.Join(f.StatePath, fmt.Sprintf("%s.json", "state"))
 	return os.WriteFile(path, brokerState, 0644)
 }
 
-func (f *FileStorage) getBrokerState() (*BrokerState, error) {
+func (f *FileStorage) GetBrokerState() (*BrokerState, error) {
 	path := filepath.Join(f.StatePath, fmt.Sprintf("%s.json", "state"))
 
 	_, err := os.Stat(path)
@@ -174,7 +116,7 @@ func (f *FileStorage) getBrokerState() (*BrokerState, error) {
 	return brokerState, nil
 }
 
-func (f *FileStorage) storeMessage(msg *Message) error {
+func (f *FileStorage) StoreMessage(msg *Message) error {
 	path := filepath.Join(f.MessagesPath, fmt.Sprintf("%s.json", msg.ID))
 
 	data, err := json.Marshal(msg)
@@ -184,7 +126,7 @@ func (f *FileStorage) storeMessage(msg *Message) error {
 	return os.WriteFile(path, data, 0644)
 }
 
-func (f *FileStorage) getMessage(msgID string) (*Message, error) {
+func (f *FileStorage) GetMessage(msgID string) (*Message, error) {
 	path := filepath.Join(f.MessagesPath, fmt.Sprintf("%s.json", msgID))
 	file, err := os.Open(path)
 	if err != nil {

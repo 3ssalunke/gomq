@@ -1,4 +1,4 @@
-package broker
+package server
 
 import (
 	"context"
@@ -6,12 +6,14 @@ import (
 	"log"
 	"strings"
 
+	"github.com/3ssalunke/gomq/broker/internal/broker"
+	"github.com/3ssalunke/gomq/broker/internal/storage"
 	"github.com/3ssalunke/gomq/shared/pkg/protoc"
 )
 
 type BrokerServiceServer struct {
 	protoc.UnimplementedBrokerServiceServer
-	Broker *Broker
+	Broker *broker.Broker
 }
 
 func (s *BrokerServiceServer) CreateExchange(ctx context.Context, req *protoc.Exchange) (*protoc.BrokerResponse, error) {
@@ -23,7 +25,7 @@ func (s *BrokerServiceServer) CreateExchange(ctx context.Context, req *protoc.Ex
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	if err := s.Broker.createExchange(exchangeName, exchangeType, exchangeSchema); err != nil {
+	if err := s.Broker.CreateExchange(exchangeName, exchangeType, exchangeSchema); err != nil {
 		return nil, err
 	}
 
@@ -37,7 +39,7 @@ func (s *BrokerServiceServer) RemoveExchange(ctx context.Context, req *protoc.Re
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	if err := s.Broker.removeExchange(exchangeName); err != nil {
+	if err := s.Broker.RemoveExchange(exchangeName); err != nil {
 		return nil, err
 	}
 
@@ -46,7 +48,7 @@ func (s *BrokerServiceServer) RemoveExchange(ctx context.Context, req *protoc.Re
 
 func (s *BrokerServiceServer) CreateQueue(ctx context.Context, req *protoc.Queue) (*protoc.BrokerResponse, error) {
 	queueName := strings.TrimSpace(req.Name)
-	queueConfig := QueueConfig{
+	queueConfig := storage.QueueConfig{
 		DLQ:        req.Dlq,
 		MaxRetries: int8(req.MaxRetries),
 	}
@@ -55,7 +57,7 @@ func (s *BrokerServiceServer) CreateQueue(ctx context.Context, req *protoc.Queue
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	if err := s.Broker.createQueue(queueName, queueConfig); err != nil {
+	if err := s.Broker.CreateQueue(queueName, queueConfig); err != nil {
 		return nil, err
 	}
 
@@ -70,7 +72,7 @@ func (s *BrokerServiceServer) RemoveQueue(ctx context.Context, req *protoc.Remov
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	if err := s.Broker.removeQueue(exchangeName, queueName); err != nil {
+	if err := s.Broker.RemoveQueue(exchangeName, queueName); err != nil {
 		return nil, err
 	}
 
@@ -86,7 +88,7 @@ func (s *BrokerServiceServer) BindQueue(ctx context.Context, req *protoc.Binding
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	if err := s.Broker.bindQueue(req.Exchange, req.Queue, req.RoutingKey); err != nil {
+	if err := s.Broker.BindQueue(req.Exchange, req.Queue, req.RoutingKey); err != nil {
 		return nil, err
 	}
 
@@ -101,7 +103,7 @@ func (s *BrokerServiceServer) PublishMessage(ctx context.Context, req *protoc.Pu
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	err := s.Broker.publishMessage(req.Exchange, req.RoutingKey, &Message{
+	err := s.Broker.PublishMessage(req.Exchange, req.RoutingKey, &storage.Message{
 		ID:        req.Message.Id,
 		Payload:   req.Message.Payload,
 		Timestamp: req.Message.Timestamp,
@@ -121,7 +123,7 @@ func (s *BrokerServiceServer) RetrieveMessages(ctx context.Context, req *protoc.
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	queueMessages, err := s.Broker.retrieveMessages(req.Queue, int(req.Count))
+	queueMessages, err := s.Broker.RetrieveMessages(req.Queue, int(req.Count))
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +151,7 @@ func (s *BrokerServiceServer) ConsumeMessages(req *protoc.Queue, stream protoc.B
 		return fmt.Errorf("invalid request arguments")
 	}
 
-	consumer, err := s.Broker.createConsumer(queueName)
+	consumer, err := s.Broker.CreateConsumer(queueName)
 	if err != nil {
 		return err
 	}
@@ -179,7 +181,7 @@ func (s *BrokerServiceServer) MessageAcknowledge(ctx context.Context, req *proto
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	if err := s.Broker.messageAcknowledge(queueName, msgID); err != nil {
+	if err := s.Broker.MessageAcknowledge(queueName, msgID); err != nil {
 		return nil, err
 	}
 
@@ -196,7 +198,7 @@ func (s *BrokerServiceServer) RedriveDlqMessages(ctx context.Context, req *proto
 		return nil, fmt.Errorf("invalid request arguments")
 	}
 
-	if err := s.Broker.redriveDlqMessages(queueName); err != nil {
+	if err := s.Broker.RedriveDlqMessages(queueName); err != nil {
 		return nil, err
 	}
 
