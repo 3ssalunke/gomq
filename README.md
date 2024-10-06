@@ -29,7 +29,7 @@ GoMQ provides pre-built binaries for the broker server and CLI. You can download
 
    - For Linux, download `broker-linux` and `cli-linux`.
    - For Windows, download `broker.exe` and `cli.exe`.
-   - For Mac, download `broker-darwin` and `cli-darwin`.
+   - For Mac, download `broker-macos` and `cli-macos`.
 
 2. **Extract the downloaded files** (if necessary) and place them in a directory included in your system's `PATH`, or run them from the downloaded location.
 
