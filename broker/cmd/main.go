@@ -5,9 +5,9 @@ import (
 	"log"
 	"net"
 
-	"github.com/3ssalunke/gomq/internal/config"
-	_broker "github.com/3ssalunke/gomq/pkg/broker"
-	"github.com/3ssalunke/gomq/pkg/protoc"
+	"github.com/3ssalunke/gomq/broker/internal/config"
+	broker "github.com/3ssalunke/gomq/broker/pkg"
+	"github.com/3ssalunke/gomq/shared/pkg/protoc"
 	"google.golang.org/grpc"
 )
 
@@ -21,8 +21,8 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 
-	broker := _broker.NewBroker(config)
-	protoc.RegisterBrokerServiceServer(grpcServer, &_broker.BrokerServiceServer{Broker: broker})
+	_broker := broker.NewBroker(config)
+	protoc.RegisterBrokerServiceServer(grpcServer, &broker.BrokerServiceServer{Broker: _broker})
 
 	log.Printf("starting broker server at %s...\n", lis.Addr().String())
 

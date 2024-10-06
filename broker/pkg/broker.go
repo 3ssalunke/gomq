@@ -9,8 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/3ssalunke/gomq/internal/config"
-	"github.com/3ssalunke/gomq/internal/util"
+	"github.com/3ssalunke/gomq/broker/internal/config"
+	internalUtil "github.com/3ssalunke/gomq/broker/internal/util"
+	"github.com/3ssalunke/gomq/shared/util"
 	"github.com/google/uuid"
 )
 
@@ -229,7 +230,7 @@ func (b *Broker) createExchange(name, exchangeType, exchangeSchema string) error
 		return fmt.Errorf("exchange with the name %s already exists", name)
 	}
 
-	if err := util.ValidateProtobufSchema(exchangeSchema); err != nil {
+	if err := internalUtil.ValidateProtobufSchema(exchangeSchema); err != nil {
 		log.Printf("error while validating protobuf message schema for payload %v", err)
 		return fmt.Errorf("error while validating protobuf message schema for payload %v", err)
 	}

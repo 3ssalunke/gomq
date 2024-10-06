@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/3ssalunke/gomq/internal/util"
-	"github.com/3ssalunke/gomq/pkg/protoc"
+	"github.com/3ssalunke/gomq/shared/pkg/protoc"
+	"github.com/3ssalunke/gomq/shared/util"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

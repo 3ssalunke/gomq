@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 
-	"github.com/3ssalunke/gomq/internal/util"
-	"github.com/3ssalunke/gomq/pkg/client"
+	client "github.com/3ssalunke/gomq/client/pkg"
+	"github.com/3ssalunke/gomq/shared/util"
 	"github.com/spf13/cobra"
 )
 

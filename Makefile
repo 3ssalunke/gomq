@@ -1,38 +1,35 @@
 proto-compile:
-	@protoc --go_out=./pkg --go-grpc_out=./pkg ./pkg/proto/*.proto
-
-cli-proto-compile:
-	@protoc --go_out=./cmd/cli --go-grpc_out=./cmd/cli ./cmd/cli/proto/*.proto
+	@protoc --go_out=./shared/pkg --go-grpc_out=./shared/pkg ./shared/pkg/proto/*.proto
 
 build-broker:
-	@go build -o ./bin/broker.exe ./cmd/broker/main.go
+	@go build -o ./bin/broker.exe ./broker/cmd/main.go
 
 build-broker-linux:
-	@GOOS=linux GOARCH=amd64 go build -o ./bin/broker-linux ./cmd/broker/main.go
+	@GOOS=linux GOARCH=amd64 go build -o ./bin/broker-linux ./broker/cmd/main.go
 
 build-broker-macos:
-	@GOOS=darwin GOARCH=amd64 go build -o ./bin/broker-macos ./cmd/broker/main.go
+	@GOOS=darwin GOARCH=amd64 go build -o ./bin/broker-macos ./broker/cmd/main.go
 
 run-broker-build: build-broker
 	@./bin/broker
 
 build-cli:
-	@go build -o ./bin/cli.exe ./cmd/cli/main.go
+	@go build -o ./bin/cli.exe ./client/cmd/main.go
 
 build-cli-linux:
-	@GOOS=linux GOARCH=amd64 go build -o ./bin/cli-linux ./cmd/cli/main.go
+	@GOOS=linux GOARCH=amd64 go build -o ./bin/cli-linux ./client/cmd/main.go
 
 build-cli-macos:
-	@GOOS=darwin GOARCH=amd64 go build -o ./bin/cli-macos ./cmd/cli/main.go
+	@GOOS=darwin GOARCH=amd64 go build -o ./bin/cli-macos ./client/cmd/main.go
 
 run-cli-build: build-cli
 	@./bin/cli
 
 run-broker:
-	@go run ./cmd/broker/main.go
+	@go run ./broker/cmd/main.go
 
 run-cli:
-	@go run ./cmd/cli/main.go
+	@go run ./client/cmd/main.go
 
 run-tests:
 	@go test -v ./...

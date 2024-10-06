@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/3ssalunke/gomq/pkg/protoc"
+	"github.com/3ssalunke/gomq/shared/pkg/protoc"
 )
 
 type BrokerServiceServer struct {
