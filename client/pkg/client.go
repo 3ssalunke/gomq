@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/3ssalunke/gomq/client/internal/config"
+	clientutil "github.com/3ssalunke/gomq/client/internal/util"
 	"github.com/3ssalunke/gomq/shared/pkg/protoc"
 	"github.com/3ssalunke/gomq/shared/util"
 	"github.com/google/uuid"
@@ -143,11 +144,11 @@ func (c *MQClient) PublishMessage(exchangeName, routingKey string, message inter
 	}
 	defer conn.Close()
 
-	protoFileName := strings.ToLower(exchangeName) + ".proto"
+	descriptorFileName := strings.ToLower(exchangeName) + ".bin"
 
-	fd, err := protoregistry.GlobalFiles.FindFileByPath(protoFileName)
+	fd, err := clientutil.LoadDescriptorFromFile(descriptorFileName)
 	if err != nil {
-		log.Printf("error finding registered %s file: %v\n", protoFileName, err)
+		log.Printf("error finding registered %s file: %v\n", strings.ToLower(exchangeName), err)
 
 		res, err := client.GetExchangeSchema(context.TODO(), &protoc.GetExchangeSchemaRequest{ExchangeName: exchangeName})
 		if err != nil {
@@ -155,14 +156,14 @@ func (c *MQClient) PublishMessage(exchangeName, routingKey string, message inter
 		}
 		schema := res.Schema
 
-		if err := util.RegisterDescriptorInRegistry(schema, strings.ToLower(exchangeName)); err != nil {
+		if err := clientutil.StoreDescriptorToFile(schema, strings.ToLower(exchangeName)); err != nil {
 			log.Printf("error registering descriptor: %v\n", err)
 			return "", err
 		}
 
-		fd, err = protoregistry.GlobalFiles.FindFileByPath(protoFileName)
+		fd, err = clientutil.LoadDescriptorFromFile(descriptorFileName)
 		if err != nil {
-			log.Printf("error finding registered %s: %v\n", protoFileName, err)
+			log.Printf("error finding registered %s: %v\n", strings.ToLower(exchangeName), err)
 			return "", err
 		}
 	}

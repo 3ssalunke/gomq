@@ -3,14 +3,13 @@ package util
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"google.golang.org/protobuf/proto" // Import for proto.Unmarshal
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -18,11 +17,10 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
-// Function to generate Protobuf descriptor from schema string
-func generateDescriptor(schema, filename string) (*descriptorpb.FileDescriptorSet, error) {
+func GenerateDescriptor(schema, protoFileName string) (*descriptorpb.FileDescriptorSet, error) {
 	var tmpFile *os.File
-	if filename != "" {
-		tmpFileName := filename + ".proto"
+	if protoFileName != "" {
+		tmpFileName := protoFileName + ".proto"
 
 		var err error
 		tmpFile, err = os.Create(tmpFileName)
@@ -31,7 +29,7 @@ func generateDescriptor(schema, filename string) (*descriptorpb.FileDescriptorSe
 		}
 	} else {
 		var err error
-		tmpFile, err = ioutil.TempFile("", "*.proto")
+		tmpFile, err = os.CreateTemp("", "*.proto")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create temp file: %v", err)
 		}
@@ -45,7 +43,7 @@ func generateDescriptor(schema, filename string) (*descriptorpb.FileDescriptorSe
 
 	protoDir := filepath.Dir(tmpFile.Name())
 
-	outputFile, err := ioutil.TempFile("", "*.bin")
+	outputFile, err := os.CreateTemp("", "*.bin")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create output temp file: %v", err)
 	}
@@ -58,7 +56,7 @@ func generateDescriptor(schema, filename string) (*descriptorpb.FileDescriptorSe
 		return nil, fmt.Errorf("protoc validation failed: %v: %s", err, stderr.String())
 	}
 
-	descriptorData, err := ioutil.ReadFile(outputFile.Name())
+	descriptorData, err := os.ReadFile(outputFile.Name())
 	if err != nil {
 		return nil, fmt.Errorf("failed to read descriptor file: %v", err)
 	}
@@ -71,8 +69,8 @@ func generateDescriptor(schema, filename string) (*descriptorpb.FileDescriptorSe
 	return &fileDescriptorSet, nil
 }
 
-func RegisterDescriptorInRegistry(schema, filename string) error {
-	fileDescriptorSet, err := generateDescriptor(schema, filename)
+func RegisterDescriptorInRegistry(schema, protoFileName string) error {
+	fileDescriptorSet, err := GenerateDescriptor(schema, protoFileName)
 	if err != nil {
 		return fmt.Errorf("failed to generate descriptor: %v", err)
 	}
@@ -86,8 +84,6 @@ func RegisterDescriptorInRegistry(schema, filename string) error {
 		if err := protoregistry.GlobalFiles.RegisterFile(fd); err != nil {
 			return fmt.Errorf("failed to register FileDescriptor: %v", err)
 		}
-
-		fmt.Printf("Successfully registered: %s\n", fd.Path())
 	}
 	return nil
 }
@@ -122,6 +118,5 @@ func UnmarshalBytesToProtobuf(messageBytes []byte, exchangeName, schema string) 
 		return fmt.Errorf("failed to unmarshal bytes into Protobuf message: %v", err)
 	}
 
-	fmt.Printf("Dynamic Message: %v\n", dynamicMessage)
 	return nil
 }

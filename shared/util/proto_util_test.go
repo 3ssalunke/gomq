@@ -18,7 +18,7 @@ func TestGenerateDescriptor_ValidSchema(t *testing.T) {
 	`
 
 	// Call the function
-	descriptor, err := generateDescriptor(schema, "")
+	descriptor, err := GenerateDescriptor(schema, "")
 
 	// Assertions
 	require.NoError(t, err, "Expected no error for valid schema")
@@ -36,7 +36,7 @@ func TestGenerateDescriptor_InvalidSchema(t *testing.T) {
 	`
 
 	// Call the function
-	_, err := generateDescriptor(schema, "")
+	_, err := GenerateDescriptor(schema, "")
 
 	// Assertions
 	require.Error(t, err, "Expected error for invalid schema")
