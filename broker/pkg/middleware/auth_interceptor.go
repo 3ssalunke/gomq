@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/3ssalunke/gomq/broker/internal/auth"
 	"google.golang.org/grpc"
@@ -11,7 +12,10 @@ import (
 
 func getApiKeyFromMetadata(md metadata.MD) string {
 	if values := md["authorization"]; len(values) > 0 {
-		return values[0]
+		authHeader := values[0]
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			return strings.TrimPrefix(authHeader, "Bearer ")
+		}
 	}
 
 	return ""

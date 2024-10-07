@@ -49,7 +49,9 @@ func (c *MQClient) CreateExchange(name, extype, schema string) (string, error) {
 	}
 	defer conn.Close()
 
-	res, err := client.CreateExchange(context.TODO(), &protoc.Exchange{Name: name, Type: extype, Schema: schema})
+	authContext := clientutil.GetAuthContext(context.Background())
+
+	res, err := client.CreateExchange(authContext, &protoc.Exchange{Name: name, Type: extype, Schema: schema})
 	if err != nil {
 		return "", err
 	}
@@ -63,7 +65,9 @@ func (c *MQClient) RemoveExchange(name string) (string, error) {
 	}
 	defer conn.Close()
 
-	res, err := client.RemoveExchange(context.TODO(), &protoc.RemoveExchangeRequest{ExchangeName: name})
+	authContext := clientutil.GetAuthContext(context.Background())
+
+	res, err := client.RemoveExchange(authContext, &protoc.RemoveExchangeRequest{ExchangeName: name})
 	if err != nil {
 		return "", err
 	}
@@ -83,7 +87,9 @@ func (c *MQClient) CreateQueue(name string, dlq bool, maxRetries int8) (string, 
 		MaxRetries: int32(maxRetries),
 	}
 
-	res, err := client.CreateQueue(context.TODO(), queue)
+	authContext := clientutil.GetAuthContext(context.Background())
+
+	res, err := client.CreateQueue(authContext, queue)
 	if err != nil {
 		return "", err
 	}
@@ -97,7 +103,9 @@ func (c *MQClient) RemoveQueue(exchangeName, queueName string) (string, error) {
 	}
 	defer conn.Close()
 
-	res, err := client.RemoveQueue(context.TODO(), &protoc.RemoveQueueRequest{ExchangeName: exchangeName, QueueName: queueName})
+	authContext := clientutil.GetAuthContext(context.Background())
+
+	res, err := client.RemoveQueue(authContext, &protoc.RemoveQueueRequest{ExchangeName: exchangeName, QueueName: queueName})
 	if err != nil {
 		return "", err
 	}
@@ -111,7 +119,9 @@ func (c *MQClient) BindQueue(exchangeName, queueName, routingKey string) (string
 	}
 	defer conn.Close()
 
-	res, err := client.BindQueue(context.TODO(), &protoc.Binding{Exchange: exchangeName, Queue: queueName, RoutingKey: routingKey})
+	authContext := clientutil.GetAuthContext(context.Background())
+
+	res, err := client.BindQueue(authContext, &protoc.Binding{Exchange: exchangeName, Queue: queueName, RoutingKey: routingKey})
 	if err != nil {
 		return "", err
 	}
@@ -201,7 +211,10 @@ func (c *MQClient) PublishMessage(exchangeName, routingKey string, message inter
 		Payload:   payload,
 		Timestamp: time.Now().UnixMilli(),
 	}
-	res, err := client.PublishMessage(context.TODO(), &protoc.PublishMessageRequest{Exchange: exchangeName, RoutingKey: routingKey, Message: encodedMessage})
+
+	authContext := clientutil.GetAuthContext(context.Background())
+
+	res, err := client.PublishMessage(authContext, &protoc.PublishMessageRequest{Exchange: exchangeName, RoutingKey: routingKey, Message: encodedMessage})
 	if err != nil {
 		return "", err
 	}
@@ -216,7 +229,9 @@ func (c *MQClient) RetrieveMessages(queueName string, count int32) (string, erro
 	}
 	defer conn.Close()
 
-	res, err := client.RetrieveMessages(context.TODO(), &protoc.RetrieveMessagesRequest{Queue: queueName, Count: count})
+	authContext := clientutil.GetAuthContext(context.Background())
+
+	res, err := client.RetrieveMessages(authContext, &protoc.RetrieveMessagesRequest{Queue: queueName, Count: count})
 	if err != nil {
 		return "", err
 	}
@@ -236,7 +251,9 @@ func (c *MQClient) CliStartConsumer(queueName string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	stream, err := client.ConsumeMessages(ctx, &protoc.Queue{Name: queueName})
+	authContext := clientutil.GetAuthContext(ctx)
+
+	stream, err := client.ConsumeMessages(authContext, &protoc.Queue{Name: queueName})
 	if err != nil {
 		return err
 	}
@@ -284,7 +301,9 @@ func (c *MQClient) CliStartConsumer(queueName string) error {
 			connectionRetries = 0
 		}
 
-		client.MessageAcknowledge(ctx, &protoc.MessageAckRequest{Queue: queueName, MesssageId: msg.Id})
+		authContext := clientutil.GetAuthContext(context.Background())
+		client.MessageAcknowledge(authContext, &protoc.MessageAckRequest{Queue: queueName, MesssageId: msg.Id})
+
 		log.Println(msg.Payload)
 	}
 }
@@ -299,7 +318,9 @@ func (c *MQClient) StartConsumer(exchangeName, queueName string, message interfa
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	stream, err := client.ConsumeMessages(ctx, &protoc.Queue{Name: queueName})
+	authContext := clientutil.GetAuthContext(ctx)
+
+	stream, err := client.ConsumeMessages(authContext, &protoc.Queue{Name: queueName})
 	if err != nil {
 		return err
 	}
@@ -347,7 +368,8 @@ func (c *MQClient) StartConsumer(exchangeName, queueName string, message interfa
 			connectionRetries = 0
 		}
 
-		client.MessageAcknowledge(ctx, &protoc.MessageAckRequest{Queue: queueName, MesssageId: msg.Id})
+		authContext := clientutil.GetAuthContext(context.Background())
+		client.MessageAcknowledge(authContext, &protoc.MessageAckRequest{Queue: queueName, MesssageId: msg.Id})
 
 		protoFileName := strings.ToLower(exchangeName) + ".proto"
 
@@ -355,7 +377,8 @@ func (c *MQClient) StartConsumer(exchangeName, queueName string, message interfa
 		if err != nil {
 			log.Printf("error finding registered %s file: %v\n", protoFileName, err)
 
-			res, err := client.GetExchangeSchema(context.TODO(), &protoc.GetExchangeSchemaRequest{ExchangeName: exchangeName})
+			authContext := clientutil.GetAuthContext(context.Background())
+			res, err := client.GetExchangeSchema(authContext, &protoc.GetExchangeSchemaRequest{ExchangeName: exchangeName})
 			if err != nil {
 				return err
 			}
