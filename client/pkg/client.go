@@ -160,7 +160,8 @@ func (c *MQClient) PublishMessage(exchangeName, routingKey string, message inter
 	if err != nil {
 		log.Printf("error finding registered %s file: %v\n", strings.ToLower(exchangeName), err)
 
-		res, err := client.GetExchangeSchema(context.TODO(), &protoc.GetExchangeSchemaRequest{ExchangeName: exchangeName})
+		authContext := clientutil.GetAuthContext(context.Background())
+		res, err := client.GetExchangeSchema(authContext, &protoc.GetExchangeSchemaRequest{ExchangeName: exchangeName})
 		if err != nil {
 			return "", err
 		}

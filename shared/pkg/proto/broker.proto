@@ -73,6 +73,17 @@ message GetExchangeSchemaResponse{
   string schema = 3;
 }
 
+message CreateUserRequest{
+  string username = 1;
+  string role = 2;
+}
+
+message CreateUserResponse{
+  bool status = 1;
+  string message = 2;
+  string api_key = 3;
+}
+
 service BrokerService {
   rpc CreateExchange(Exchange) returns (BrokerResponse);
   rpc RemoveExchange(RemoveExchangeRequest) returns (BrokerResponse);
@@ -85,4 +96,5 @@ service BrokerService {
   rpc MessageAcknowledge(MessageAckRequest) returns (BrokerResponse);
   rpc RedriveDlqMessages(Queue) returns (BrokerResponse);
   rpc GetExchangeSchema(GetExchangeSchemaRequest) returns (GetExchangeSchemaResponse);
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
 }

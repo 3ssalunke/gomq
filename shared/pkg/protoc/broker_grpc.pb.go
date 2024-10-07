@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v3.19.1
-// source: pkg/proto/broker.proto
+// source: shared/pkg/proto/broker.proto
 
 package protoc
 
@@ -33,6 +33,7 @@ type BrokerServiceClient interface {
 	MessageAcknowledge(ctx context.Context, in *MessageAckRequest, opts ...grpc.CallOption) (*BrokerResponse, error)
 	RedriveDlqMessages(ctx context.Context, in *Queue, opts ...grpc.CallOption) (*BrokerResponse, error)
 	GetExchangeSchema(ctx context.Context, in *GetExchangeSchemaRequest, opts ...grpc.CallOption) (*GetExchangeSchemaResponse, error)
+	CreateUser(ctx context.Context, in *CreateUserRequest, opts ...grpc.CallOption) (*CreateUserResponse, error)
 }
 
 type brokerServiceClient struct {
@@ -165,6 +166,15 @@ func (c *brokerServiceClient) GetExchangeSchema(ctx context.Context, in *GetExch
 	return out, nil
 }
 
+func (c *brokerServiceClient) CreateUser(ctx context.Context, in *CreateUserRequest, opts ...grpc.CallOption) (*CreateUserResponse, error) {
+	out := new(CreateUserResponse)
+	err := c.cc.Invoke(ctx, "/gomq.broker.BrokerService/CreateUser", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BrokerServiceServer is the server API for BrokerService service.
 // All implementations must embed UnimplementedBrokerServiceServer
 // for forward compatibility
@@ -180,6 +190,7 @@ type BrokerServiceServer interface {
 	MessageAcknowledge(context.Context, *MessageAckRequest) (*BrokerResponse, error)
 	RedriveDlqMessages(context.Context, *Queue) (*BrokerResponse, error)
 	GetExchangeSchema(context.Context, *GetExchangeSchemaRequest) (*GetExchangeSchemaResponse, error)
+	CreateUser(context.Context, *CreateUserRequest) (*CreateUserResponse, error)
 	mustEmbedUnimplementedBrokerServiceServer()
 }
 
@@ -219,6 +230,9 @@ func (UnimplementedBrokerServiceServer) RedriveDlqMessages(context.Context, *Que
 }
 func (UnimplementedBrokerServiceServer) GetExchangeSchema(context.Context, *GetExchangeSchemaRequest) (*GetExchangeSchemaResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetExchangeSchema not implemented")
+}
+func (UnimplementedBrokerServiceServer) CreateUser(context.Context, *CreateUserRequest) (*CreateUserResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateUser not implemented")
 }
 func (UnimplementedBrokerServiceServer) mustEmbedUnimplementedBrokerServiceServer() {}
 
@@ -434,6 +448,24 @@ func _BrokerService_GetExchangeSchema_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BrokerService_CreateUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BrokerServiceServer).CreateUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/gomq.broker.BrokerService/CreateUser",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BrokerServiceServer).CreateUser(ctx, req.(*CreateUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // BrokerService_ServiceDesc is the grpc.ServiceDesc for BrokerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -481,6 +513,10 @@ var BrokerService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetExchangeSchema",
 			Handler:    _BrokerService_GetExchangeSchema_Handler,
 		},
+		{
+			MethodName: "CreateUser",
+			Handler:    _BrokerService_CreateUser_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -489,5 +525,5 @@ var BrokerService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "pkg/proto/broker.proto",
+	Metadata: "shared/pkg/proto/broker.proto",
 }

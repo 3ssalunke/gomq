@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/3ssalunke/gomq/broker/internal/auth"
 	"github.com/3ssalunke/gomq/broker/internal/config"
 	"github.com/3ssalunke/gomq/broker/internal/storage"
 	internalutil "github.com/3ssalunke/gomq/broker/internal/util"
@@ -50,6 +51,8 @@ type Broker struct {
 
 	fileStorage *storage.FileStorage
 
+	users map[string]*auth.User
+
 	mu sync.Mutex
 }
 
@@ -77,6 +80,7 @@ func NewBroker(config config.Config) *Broker {
 		consumers:         make(map[string]*ConsumersList),
 		stopConsumerChans: make(map[string]chan bool),
 		messageRetries:    make(map[string]int8),
+		users:             make(map[string]*auth.User),
 		fileStorage:       fileStorage,
 	}
 
@@ -220,6 +224,34 @@ func (b *Broker) restoreBroker() error {
 	b.schemaRegistry = brokerMetadata.SchemaRegistry
 
 	return nil
+}
+
+func (b *Broker) CreateUser(username string, role string) (string, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if util.MapContains(b.users, username) {
+		log.Printf("user with name %s already exists", username)
+		return "", fmt.Errorf("user with name %s already exists", username)
+	}
+
+	parsedRole, err := auth.NewRole(role)
+	if err != nil {
+		log.Printf("role %s is invalid role: %v", role, err)
+		return "", fmt.Errorf("role %s is invalid role", role)
+	}
+
+	apiKey := uuid.New().String()
+
+	user := &auth.User{
+		Name:   username,
+		Role:   parsedRole,
+		ApiKey: apiKey,
+	}
+
+	b.users[username] = user
+
+	return apiKey, nil
 }
 
 func (b *Broker) CreateExchange(name, exchangeType, exchangeSchema string) error {
@@ -504,9 +536,6 @@ func (b *Broker) CreateConsumer(queueName string) (*Consumer, error) {
 }
 
 func (b *Broker) moveToDLQ(dlqName string, message *storage.Message) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	if !util.MapContains(b.queues, dlqName) {
 		b.queues[dlqName] = &storage.Queue{
 			Name:     dlqName,
@@ -520,8 +549,10 @@ func (b *Broker) moveToDLQ(dlqName string, message *storage.Message) {
 }
 
 func (b *Broker) consumeMessage(queueName string, stopChan chan bool) {
+	b.mu.Lock()
 	dlq := b.queues[queueName].Config.DLQ
 	maxRetries := b.queues[queueName].Config.MaxRetries
+	b.mu.Unlock()
 
 	for {
 		select {
@@ -600,7 +631,6 @@ func (b *Broker) consumeMessage(queueName string, stopChan chan bool) {
 
 				b.consumers[queueName].LastIndex = nextIndex
 			}
-
 		}
 	}
 }
@@ -638,6 +668,7 @@ func (b *Broker) MessageAcknowledge(queueName, msgID string) error {
 
 func (b *Broker) clearNackMessages() {
 	for {
+		b.mu.Lock()
 		log.Printf("clearing not acknowledged messages...")
 		for queueName, messages := range b.pendingAcks {
 			for messageID, pending := range messages {
@@ -650,8 +681,11 @@ func (b *Broker) clearNackMessages() {
 			}
 		}
 		if err := b.saveState(); err != nil {
+			b.mu.Unlock()
 			log.Printf("error saving broker state %s", err.Error())
 		}
+
+		b.mu.Unlock()
 		time.Sleep(time.Second * time.Duration(b.config.MessageNackClearInterval))
 	}
 }
@@ -669,6 +703,9 @@ func (b *Broker) RetrieveMessages(queueName string, n int) ([]*storage.Message, 
 }
 
 func (b *Broker) RedriveDlqMessages(queueName string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	dlqName := fmt.Sprintf("%s-dead-letter", queueName)
 
 	if !util.MapContains(b.queues, queueName) {
@@ -689,6 +726,9 @@ func (b *Broker) RedriveDlqMessages(queueName string) error {
 }
 
 func (b *Broker) GetExchangeSchema(exchangeName string) (string, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if !util.MapContains(b.schemaRegistry, exchangeName) {
 		log.Printf("exchange %s does not exist", exchangeName)
 		return "", fmt.Errorf("exchange %s does not exist", exchangeName)

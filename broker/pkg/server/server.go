@@ -16,6 +16,26 @@ type BrokerServiceServer struct {
 	Broker *broker.Broker
 }
 
+func (s *BrokerServiceServer) CreateUser(ctx context.Context, req *protoc.CreateUserRequest) (*protoc.CreateUserResponse, error) {
+	username := strings.TrimSpace(req.Username)
+	role := strings.TrimSpace(req.Role)
+
+	if username == "" || role == "" {
+		return nil, fmt.Errorf("invalid request arguments")
+	}
+
+	apiKey, err := s.Broker.CreateUser(username, role)
+	if err != nil {
+		return nil, err
+	}
+
+	return &protoc.CreateUserResponse{
+		Status:  true,
+		Message: fmt.Sprintf("user %s created with role %s", username, role),
+		ApiKey:  apiKey,
+	}, nil
+}
+
 func (s *BrokerServiceServer) CreateExchange(ctx context.Context, req *protoc.Exchange) (*protoc.BrokerResponse, error) {
 	exchangeName := strings.TrimSpace(req.Name)
 	exchangeType := strings.TrimSpace(req.Type)
