@@ -6,9 +6,13 @@ import (
 	"log"
 	"strings"
 
+	"github.com/3ssalunke/gomq/broker/internal/auth"
 	"github.com/3ssalunke/gomq/broker/internal/broker"
 	"github.com/3ssalunke/gomq/broker/internal/storage"
+	"github.com/3ssalunke/gomq/broker/pkg/middleware"
 	"github.com/3ssalunke/gomq/shared/pkg/protoc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type BrokerServiceServer struct {
@@ -16,12 +20,39 @@ type BrokerServiceServer struct {
 	Broker *broker.Broker
 }
 
+func (s *BrokerServiceServer) CreateAdmin(ctx context.Context, req *protoc.CreateUserRequest) (*protoc.CreateUserResponse, error) {
+	username := strings.TrimSpace(req.Username)
+	if username == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request arguments")
+	}
+
+	apiKey, err := s.Broker.CreateAdmin(username)
+	if err != nil {
+		return nil, status.Errorf(codes.Unknown, err.Error())
+	}
+
+	return &protoc.CreateUserResponse{
+		Status:  true,
+		Message: fmt.Sprintf("user %s created with role admin", username),
+		ApiKey:  apiKey,
+	}, nil
+}
+
 func (s *BrokerServiceServer) CreateUser(ctx context.Context, req *protoc.CreateUserRequest) (*protoc.CreateUserResponse, error) {
+	user, ok := ctx.Value(middleware.UserKey).(*auth.User)
+	if !ok {
+		return nil, status.Errorf(codes.Internal, "user not found in context")
+	}
+
+	if user.Role != auth.Admin {
+		return nil, status.Errorf(codes.PermissionDenied, "user is not admin")
+	}
+
 	username := strings.TrimSpace(req.Username)
 	role := strings.TrimSpace(req.Role)
 
 	if username == "" || role == "" {
-		return nil, fmt.Errorf("invalid request arguments")
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request arguments")
 	}
 
 	apiKey, err := s.Broker.CreateUser(username, role)
@@ -42,11 +73,11 @@ func (s *BrokerServiceServer) CreateExchange(ctx context.Context, req *protoc.Ex
 	exchangeSchema := strings.TrimSpace(req.Schema)
 
 	if exchangeName == "" || exchangeType == "" || exchangeSchema == "" {
-		return nil, fmt.Errorf("invalid request arguments")
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request arguments")
 	}
 
 	if err := s.Broker.CreateExchange(exchangeName, exchangeType, exchangeSchema); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unknown, err.Error())
 	}
 
 	return &protoc.BrokerResponse{Status: true, Message: fmt.Sprintf("exchange %s of type %s created", exchangeName, exchangeType)}, nil
@@ -56,11 +87,11 @@ func (s *BrokerServiceServer) RemoveExchange(ctx context.Context, req *protoc.Re
 	exchangeName := strings.TrimSpace(req.ExchangeName)
 
 	if exchangeName == "" {
-		return nil, fmt.Errorf("invalid request arguments")
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request arguments")
 	}
 
 	if err := s.Broker.RemoveExchange(exchangeName); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unknown, err.Error())
 	}
 
 	return &protoc.BrokerResponse{Status: true, Message: fmt.Sprintf("exchange %s removed", exchangeName)}, nil
@@ -74,11 +105,11 @@ func (s *BrokerServiceServer) CreateQueue(ctx context.Context, req *protoc.Queue
 	}
 
 	if queueName == "" {
-		return nil, fmt.Errorf("invalid request arguments")
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request arguments")
 	}
 
 	if err := s.Broker.CreateQueue(queueName, queueConfig); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unknown, err.Error())
 	}
 
 	return &protoc.BrokerResponse{Status: true, Message: fmt.Sprintf("queue %s created", queueName)}, nil
@@ -89,11 +120,11 @@ func (s *BrokerServiceServer) RemoveQueue(ctx context.Context, req *protoc.Remov
 	queueName := strings.TrimSpace(req.QueueName)
 
 	if queueName == "" || exchangeName == "" {
-		return nil, fmt.Errorf("invalid request arguments")
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request arguments")
 	}
 
 	if err := s.Broker.RemoveQueue(exchangeName, queueName); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unknown, err.Error())
 	}
 
 	return &protoc.BrokerResponse{Status: true, Message: fmt.Sprintf("queue %s removed from exchange %s", queueName, exchangeName)}, nil
@@ -105,11 +136,11 @@ func (s *BrokerServiceServer) BindQueue(ctx context.Context, req *protoc.Binding
 	routingKey := strings.TrimSpace(req.RoutingKey)
 
 	if exchange == "" || queue == "" || routingKey == "" {
-		return nil, fmt.Errorf("invalid request arguments")
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request arguments")
 	}
 
 	if err := s.Broker.BindQueue(req.Exchange, req.Queue, req.RoutingKey); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unknown, err.Error())
 	}
 
 	return &protoc.BrokerResponse{Status: true, Message: fmt.Sprintf("queue %s is binded to exchange %s by routing key %s", queue, exchange, routingKey)}, nil
@@ -120,7 +151,7 @@ func (s *BrokerServiceServer) PublishMessage(ctx context.Context, req *protoc.Pu
 	routingKey := strings.TrimSpace(req.RoutingKey)
 
 	if exchange == "" || routingKey == "" {
-		return nil, fmt.Errorf("invalid request arguments")
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request arguments")
 	}
 
 	err := s.Broker.PublishMessage(req.Exchange, req.RoutingKey, &storage.Message{
@@ -129,7 +160,7 @@ func (s *BrokerServiceServer) PublishMessage(ctx context.Context, req *protoc.Pu
 		Timestamp: req.Message.Timestamp,
 	})
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unknown, err.Error())
 	}
 
 	return &protoc.BrokerResponse{Status: true, Message: fmt.Sprintf("message published to exchange %s with routing key %s", exchange, routingKey)}, nil
@@ -140,12 +171,12 @@ func (s *BrokerServiceServer) RetrieveMessages(ctx context.Context, req *protoc.
 	count := req.Count
 
 	if queue == "" || count <= 0 {
-		return nil, fmt.Errorf("invalid request arguments")
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request arguments")
 	}
 
 	queueMessages, err := s.Broker.RetrieveMessages(req.Queue, int(req.Count))
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unknown, err.Error())
 	}
 	pbMessages := []*protoc.Message{}
 	for _, msg := range queueMessages {
@@ -168,12 +199,12 @@ func (s *BrokerServiceServer) ConsumeMessages(req *protoc.Queue, stream protoc.B
 	queueName := strings.TrimSpace(req.Name)
 
 	if queueName == "" {
-		return fmt.Errorf("invalid request arguments")
+		return status.Errorf(codes.InvalidArgument, "invalid request arguments")
 	}
 
 	consumer, err := s.Broker.CreateConsumer(queueName)
 	if err != nil {
-		return err
+		return status.Errorf(codes.Unknown, err.Error())
 	}
 
 	for msg := range consumer.MsgChan {
@@ -185,7 +216,7 @@ func (s *BrokerServiceServer) ConsumeMessages(req *protoc.Queue, stream protoc.B
 			})
 			if err != nil {
 				log.Println(err)
-				return err
+				return status.Errorf(codes.Unknown, err.Error())
 			}
 		}
 	}
@@ -198,11 +229,11 @@ func (s *BrokerServiceServer) MessageAcknowledge(ctx context.Context, req *proto
 	msgID := strings.TrimSpace(req.MesssageId)
 
 	if queueName == "" || msgID == "" {
-		return nil, fmt.Errorf("invalid request arguments")
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request arguments")
 	}
 
 	if err := s.Broker.MessageAcknowledge(queueName, msgID); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unknown, err.Error())
 	}
 
 	return &protoc.BrokerResponse{
@@ -215,11 +246,11 @@ func (s *BrokerServiceServer) RedriveDlqMessages(ctx context.Context, req *proto
 	queueName := strings.TrimSpace(req.Name)
 
 	if queueName == "" {
-		return nil, fmt.Errorf("invalid request arguments")
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request arguments")
 	}
 
 	if err := s.Broker.RedriveDlqMessages(queueName); err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Unknown, err.Error())
 	}
 
 	return &protoc.BrokerResponse{
@@ -231,7 +262,7 @@ func (s *BrokerServiceServer) RedriveDlqMessages(ctx context.Context, req *proto
 func (s *BrokerServiceServer) GetExchangeSchema(ctx context.Context, req *protoc.GetExchangeSchemaRequest) (*protoc.GetExchangeSchemaResponse, error) {
 	exchangeName := strings.TrimSpace(req.ExchangeName)
 	if exchangeName == "" {
-		return nil, fmt.Errorf("invalid request arguments")
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request arguments")
 	}
 
 	schema, err := s.Broker.GetExchangeSchema(exchangeName)

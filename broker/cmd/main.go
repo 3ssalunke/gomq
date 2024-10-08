@@ -21,11 +21,12 @@ func main() {
 		log.Fatalf(err.Error())
 	}
 
+	broker := broker.NewBroker(config)
+
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(middleware.ApiKeyAuthInterceptor),
+		grpc.UnaryInterceptor(middleware.ApiKeyAuthInterceptor(broker.Auth)),
 	)
 
-	broker := broker.NewBroker(config)
 	protoc.RegisterBrokerServiceServer(grpcServer, &server.BrokerServiceServer{Broker: broker})
 
 	log.Printf("starting broker server at %s...\n", lis.Addr().String())

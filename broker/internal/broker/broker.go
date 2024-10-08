@@ -51,7 +51,7 @@ type Broker struct {
 
 	fileStorage *storage.FileStorage
 
-	users map[string]*auth.User
+	Auth *auth.Auth
 
 	mu sync.Mutex
 }
@@ -69,6 +69,8 @@ func NewBroker(config config.Config) *Broker {
 		log.Fatal("err creating broker store", err.Error())
 	}
 
+	auth := auth.NewAuth()
+
 	broker := &Broker{
 		config:            config,
 		ackTimeout:        time.Second * time.Duration(config.MessageAckTimeout),
@@ -80,8 +82,8 @@ func NewBroker(config config.Config) *Broker {
 		consumers:         make(map[string]*ConsumersList),
 		stopConsumerChans: make(map[string]chan bool),
 		messageRetries:    make(map[string]int8),
-		users:             make(map[string]*auth.User),
 		fileStorage:       fileStorage,
+		Auth:              auth,
 	}
 
 	if err := broker.restoreBroker(); err != nil {
@@ -226,30 +228,22 @@ func (b *Broker) restoreBroker() error {
 	return nil
 }
 
-func (b *Broker) CreateUser(username string, role string) (string, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if util.MapContains(b.users, username) {
-		log.Printf("user with name %s already exists", username)
-		return "", fmt.Errorf("user with name %s already exists", username)
-	}
-
-	parsedRole, err := auth.NewRole(role)
+func (b *Broker) CreateAdmin(username string) (string, error) {
+	apiKey, err := b.Auth.CreateAdmin(username)
 	if err != nil {
-		log.Printf("role %s is invalid role: %v", role, err)
-		return "", fmt.Errorf("role %s is invalid role", role)
+		log.Printf("error while creating admin %v", err)
+		return "", fmt.Errorf("error while creating admin %v", err)
 	}
 
-	apiKey := uuid.New().String()
+	return apiKey, nil
+}
 
-	user := &auth.User{
-		Name:   username,
-		Role:   parsedRole,
-		ApiKey: apiKey,
+func (b *Broker) CreateUser(username, role string) (string, error) {
+	apiKey, err := b.Auth.CreateUser(username, role)
+	if err != nil {
+		log.Printf("error while creating admin %v", err)
+		return "", fmt.Errorf("error while creating admin %v", err)
 	}
-
-	b.users[username] = user
 
 	return apiKey, nil
 }

@@ -23,6 +23,8 @@ func NewGoMQCLI(gomqClient *client.MQClient) *GoMQCLI {
 		},
 	}
 
+	cli.rootCmd.AddCommand(cli.createAdmin())
+	cli.rootCmd.AddCommand(cli.createUser())
 	cli.rootCmd.AddCommand(cli.createExchangeCmd())
 	cli.rootCmd.AddCommand(cli.removeExchangeCmd())
 	cli.rootCmd.AddCommand(cli.createQueueCmd())
@@ -48,6 +50,59 @@ func main() {
 	if err := cli.rootCmd.Execute(); err != nil {
 		log.Fatal(err.Error())
 	}
+}
+
+func (cli *GoMQCLI) createAdmin() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "create-admin",
+		Short: "Create a new admin",
+		Run: func(cmd *cobra.Command, args []string) {
+			username, _ := cmd.Flags().GetString("user-name")
+
+			if username == "" {
+				log.Fatal("please provide user name")
+			}
+
+			msg, err := cli.client.CreateAdmin(username)
+			if err != nil {
+				log.Fatal("error while creating admin", err.Error())
+			}
+			log.Println("create-admin message", msg)
+		},
+	}
+
+	cmd.Flags().StringP("user-name", "u", "", "Name of the admin")
+
+	return cmd
+}
+
+func (cli *GoMQCLI) createUser() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "create-user",
+		Short: "Create a new user",
+		Run: func(cmd *cobra.Command, args []string) {
+			username, _ := cmd.Flags().GetString("user-name")
+			role, _ := cmd.Flags().GetString("user-role")
+
+			if username == "" {
+				log.Fatal("please provide user name")
+			}
+			if role == "" {
+				log.Fatal("please provide user role")
+			}
+
+			msg, err := cli.client.CreateUser(username, role)
+			if err != nil {
+				log.Fatal("error while creating user", err.Error())
+			}
+			log.Println("create-user message", msg)
+		},
+	}
+
+	cmd.Flags().StringP("user-name", "u", "", "Name of the user")
+	cmd.Flags().StringP("user-role", "r", "", "Role of the user")
+
+	return cmd
 }
 
 func (cli *GoMQCLI) createExchangeCmd() *cobra.Command {

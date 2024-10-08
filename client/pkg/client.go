@@ -42,6 +42,38 @@ func (c *MQClient) createClient() (*grpc.ClientConn, protoc.BrokerServiceClient,
 	return conn, protoc.NewBrokerServiceClient(conn), nil
 }
 
+func (c *MQClient) CreateAdmin(username string) (string, error) {
+	conn, client, err := c.createClient()
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	res, err := client.CreateAdmin(context.Background(), &protoc.CreateUserRequest{Username: username})
+	if err != nil {
+		return "", err
+	}
+
+	return res.ApiKey, nil
+}
+
+func (c *MQClient) CreateUser(username, role string) (string, error) {
+	conn, client, err := c.createClient()
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	authContext := clientutil.GetAuthContext(context.Background(), c.Config.ApiKey)
+
+	res, err := client.CreateUser(authContext, &protoc.CreateUserRequest{Username: username, Role: role})
+	if err != nil {
+		return "", err
+	}
+
+	return res.ApiKey, nil
+}
+
 func (c *MQClient) CreateExchange(name, extype, schema string) (string, error) {
 	conn, client, err := c.createClient()
 	if err != nil {
@@ -49,7 +81,7 @@ func (c *MQClient) CreateExchange(name, extype, schema string) (string, error) {
 	}
 	defer conn.Close()
 
-	authContext := clientutil.GetAuthContext(context.Background())
+	authContext := clientutil.GetAuthContext(context.Background(), c.Config.ApiKey)
 
 	res, err := client.CreateExchange(authContext, &protoc.Exchange{Name: name, Type: extype, Schema: schema})
 	if err != nil {
@@ -65,7 +97,7 @@ func (c *MQClient) RemoveExchange(name string) (string, error) {
 	}
 	defer conn.Close()
 
-	authContext := clientutil.GetAuthContext(context.Background())
+	authContext := clientutil.GetAuthContext(context.Background(), c.Config.ApiKey)
 
 	res, err := client.RemoveExchange(authContext, &protoc.RemoveExchangeRequest{ExchangeName: name})
 	if err != nil {
@@ -87,7 +119,7 @@ func (c *MQClient) CreateQueue(name string, dlq bool, maxRetries int8) (string, 
 		MaxRetries: int32(maxRetries),
 	}
 
-	authContext := clientutil.GetAuthContext(context.Background())
+	authContext := clientutil.GetAuthContext(context.Background(), c.Config.ApiKey)
 
 	res, err := client.CreateQueue(authContext, queue)
 	if err != nil {
@@ -103,7 +135,7 @@ func (c *MQClient) RemoveQueue(exchangeName, queueName string) (string, error) {
 	}
 	defer conn.Close()
 
-	authContext := clientutil.GetAuthContext(context.Background())
+	authContext := clientutil.GetAuthContext(context.Background(), c.Config.ApiKey)
 
 	res, err := client.RemoveQueue(authContext, &protoc.RemoveQueueRequest{ExchangeName: exchangeName, QueueName: queueName})
 	if err != nil {
@@ -119,7 +151,7 @@ func (c *MQClient) BindQueue(exchangeName, queueName, routingKey string) (string
 	}
 	defer conn.Close()
 
-	authContext := clientutil.GetAuthContext(context.Background())
+	authContext := clientutil.GetAuthContext(context.Background(), c.Config.ApiKey)
 
 	res, err := client.BindQueue(authContext, &protoc.Binding{Exchange: exchangeName, Queue: queueName, RoutingKey: routingKey})
 	if err != nil {
@@ -140,7 +172,10 @@ func (c *MQClient) CliPublishMessage(exchangeName, routingKey string, message []
 		Payload:   message,
 		Timestamp: time.Now().UnixMilli(),
 	}
-	res, err := client.PublishMessage(context.TODO(), &protoc.PublishMessageRequest{Exchange: exchangeName, RoutingKey: routingKey, Message: encodedMessage})
+
+	authContext := clientutil.GetAuthContext(context.Background(), c.Config.ApiKey)
+
+	res, err := client.PublishMessage(authContext, &protoc.PublishMessageRequest{Exchange: exchangeName, RoutingKey: routingKey, Message: encodedMessage})
 	if err != nil {
 		return "", err
 	}
@@ -160,7 +195,7 @@ func (c *MQClient) PublishMessage(exchangeName, routingKey string, message inter
 	if err != nil {
 		log.Printf("error finding registered %s file: %v\n", strings.ToLower(exchangeName), err)
 
-		authContext := clientutil.GetAuthContext(context.Background())
+		authContext := clientutil.GetAuthContext(context.Background(), c.Config.ApiKey)
 		res, err := client.GetExchangeSchema(authContext, &protoc.GetExchangeSchemaRequest{ExchangeName: exchangeName})
 		if err != nil {
 			return "", err
@@ -213,7 +248,7 @@ func (c *MQClient) PublishMessage(exchangeName, routingKey string, message inter
 		Timestamp: time.Now().UnixMilli(),
 	}
 
-	authContext := clientutil.GetAuthContext(context.Background())
+	authContext := clientutil.GetAuthContext(context.Background(), c.Config.ApiKey)
 
 	res, err := client.PublishMessage(authContext, &protoc.PublishMessageRequest{Exchange: exchangeName, RoutingKey: routingKey, Message: encodedMessage})
 	if err != nil {
@@ -230,7 +265,7 @@ func (c *MQClient) RetrieveMessages(queueName string, count int32) (string, erro
 	}
 	defer conn.Close()
 
-	authContext := clientutil.GetAuthContext(context.Background())
+	authContext := clientutil.GetAuthContext(context.Background(), c.Config.ApiKey)
 
 	res, err := client.RetrieveMessages(authContext, &protoc.RetrieveMessagesRequest{Queue: queueName, Count: count})
 	if err != nil {
@@ -252,7 +287,7 @@ func (c *MQClient) CliStartConsumer(queueName string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	authContext := clientutil.GetAuthContext(ctx)
+	authContext := clientutil.GetAuthContext(ctx, c.Config.ApiKey)
 
 	stream, err := client.ConsumeMessages(authContext, &protoc.Queue{Name: queueName})
 	if err != nil {
@@ -302,7 +337,7 @@ func (c *MQClient) CliStartConsumer(queueName string) error {
 			connectionRetries = 0
 		}
 
-		authContext := clientutil.GetAuthContext(context.Background())
+		authContext := clientutil.GetAuthContext(context.Background(), c.Config.ApiKey)
 		client.MessageAcknowledge(authContext, &protoc.MessageAckRequest{Queue: queueName, MesssageId: msg.Id})
 
 		log.Println(msg.Payload)
@@ -319,7 +354,7 @@ func (c *MQClient) StartConsumer(exchangeName, queueName string, message interfa
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	authContext := clientutil.GetAuthContext(ctx)
+	authContext := clientutil.GetAuthContext(ctx, c.Config.ApiKey)
 
 	stream, err := client.ConsumeMessages(authContext, &protoc.Queue{Name: queueName})
 	if err != nil {
@@ -369,7 +404,7 @@ func (c *MQClient) StartConsumer(exchangeName, queueName string, message interfa
 			connectionRetries = 0
 		}
 
-		authContext := clientutil.GetAuthContext(context.Background())
+		authContext := clientutil.GetAuthContext(context.Background(), c.Config.ApiKey)
 		client.MessageAcknowledge(authContext, &protoc.MessageAckRequest{Queue: queueName, MesssageId: msg.Id})
 
 		protoFileName := strings.ToLower(exchangeName) + ".proto"
@@ -378,7 +413,7 @@ func (c *MQClient) StartConsumer(exchangeName, queueName string, message interfa
 		if err != nil {
 			log.Printf("error finding registered %s file: %v\n", protoFileName, err)
 
-			authContext := clientutil.GetAuthContext(context.Background())
+			authContext := clientutil.GetAuthContext(context.Background(), c.Config.ApiKey)
 			res, err := client.GetExchangeSchema(authContext, &protoc.GetExchangeSchemaRequest{ExchangeName: exchangeName})
 			if err != nil {
 				return err

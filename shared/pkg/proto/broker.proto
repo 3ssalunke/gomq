@@ -96,5 +96,6 @@ service BrokerService {
   rpc MessageAcknowledge(MessageAckRequest) returns (BrokerResponse);
   rpc RedriveDlqMessages(Queue) returns (BrokerResponse);
   rpc GetExchangeSchema(GetExchangeSchemaRequest) returns (GetExchangeSchemaResponse);
+  rpc CreateAdmin(CreateUserRequest) returns (CreateUserResponse);
   rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
 }

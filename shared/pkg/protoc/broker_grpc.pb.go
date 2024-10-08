@@ -33,6 +33,7 @@ type BrokerServiceClient interface {
 	MessageAcknowledge(ctx context.Context, in *MessageAckRequest, opts ...grpc.CallOption) (*BrokerResponse, error)
 	RedriveDlqMessages(ctx context.Context, in *Queue, opts ...grpc.CallOption) (*BrokerResponse, error)
 	GetExchangeSchema(ctx context.Context, in *GetExchangeSchemaRequest, opts ...grpc.CallOption) (*GetExchangeSchemaResponse, error)
+	CreateAdmin(ctx context.Context, in *CreateUserRequest, opts ...grpc.CallOption) (*CreateUserResponse, error)
 	CreateUser(ctx context.Context, in *CreateUserRequest, opts ...grpc.CallOption) (*CreateUserResponse, error)
 }
 
@@ -166,6 +167,15 @@ func (c *brokerServiceClient) GetExchangeSchema(ctx context.Context, in *GetExch
 	return out, nil
 }
 
+func (c *brokerServiceClient) CreateAdmin(ctx context.Context, in *CreateUserRequest, opts ...grpc.CallOption) (*CreateUserResponse, error) {
+	out := new(CreateUserResponse)
+	err := c.cc.Invoke(ctx, "/gomq.broker.BrokerService/CreateAdmin", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *brokerServiceClient) CreateUser(ctx context.Context, in *CreateUserRequest, opts ...grpc.CallOption) (*CreateUserResponse, error) {
 	out := new(CreateUserResponse)
 	err := c.cc.Invoke(ctx, "/gomq.broker.BrokerService/CreateUser", in, out, opts...)
@@ -190,6 +200,7 @@ type BrokerServiceServer interface {
 	MessageAcknowledge(context.Context, *MessageAckRequest) (*BrokerResponse, error)
 	RedriveDlqMessages(context.Context, *Queue) (*BrokerResponse, error)
 	GetExchangeSchema(context.Context, *GetExchangeSchemaRequest) (*GetExchangeSchemaResponse, error)
+	CreateAdmin(context.Context, *CreateUserRequest) (*CreateUserResponse, error)
 	CreateUser(context.Context, *CreateUserRequest) (*CreateUserResponse, error)
 	mustEmbedUnimplementedBrokerServiceServer()
 }
@@ -230,6 +241,9 @@ func (UnimplementedBrokerServiceServer) RedriveDlqMessages(context.Context, *Que
 }
 func (UnimplementedBrokerServiceServer) GetExchangeSchema(context.Context, *GetExchangeSchemaRequest) (*GetExchangeSchemaResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetExchangeSchema not implemented")
+}
+func (UnimplementedBrokerServiceServer) CreateAdmin(context.Context, *CreateUserRequest) (*CreateUserResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateAdmin not implemented")
 }
 func (UnimplementedBrokerServiceServer) CreateUser(context.Context, *CreateUserRequest) (*CreateUserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateUser not implemented")
@@ -448,6 +462,24 @@ func _BrokerService_GetExchangeSchema_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BrokerService_CreateAdmin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BrokerServiceServer).CreateAdmin(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/gomq.broker.BrokerService/CreateAdmin",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BrokerServiceServer).CreateAdmin(ctx, req.(*CreateUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _BrokerService_CreateUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateUserRequest)
 	if err := dec(in); err != nil {
@@ -512,6 +544,10 @@ var BrokerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetExchangeSchema",
 			Handler:    _BrokerService_GetExchangeSchema_Handler,
+		},
+		{
+			MethodName: "CreateAdmin",
+			Handler:    _BrokerService_CreateAdmin_Handler,
 		},
 		{
 			MethodName: "CreateUser",

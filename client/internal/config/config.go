@@ -7,6 +7,8 @@ import (
 )
 
 type Config struct {
+	ApiKey string
+
 	BrokerAddr string
 
 	MaxStreamRetries          uint16
@@ -16,6 +18,7 @@ type Config struct {
 }
 
 func LoadConfig() Config {
+	viper.SetDefault("API_KEY", "superadmin")
 	viper.SetDefault("BROKER_ADDR", "localhost")
 	viper.SetDefault("MAX_STREAM_RETRIES", "3")
 	viper.SetDefault("MAX_CONNECTION_RETRIES", "3")
@@ -31,6 +34,7 @@ func LoadConfig() Config {
 	}
 
 	return Config{
+		ApiKey:                    viper.GetString("API_KEY"),
 		BrokerAddr:                viper.GetString("BROKER_ADDR"),
 		MaxStreamRetries:          viper.GetUint16("MAX_STREAM_RETRIES"),
 		MaxConnectionRetries:      viper.GetUint16("MAX_CONNECTION_RETRIES"),
