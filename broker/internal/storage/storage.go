@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/3ssalunke/gomq/broker/internal/auth"
 )
 
 type FileStorage struct {
@@ -20,9 +22,15 @@ type BrokerState struct {
 	PendingAcks map[string][]string            `json:"pending_acks"`
 }
 
+type AuthStore struct {
+	Admin auth.User
+	Users map[string]auth.User
+}
+
 type BrokerMetadata struct {
 	QueueConfigs   map[string]QueueConfig `json:"queue_configs"`
 	SchemaRegistry map[string]string      `json:"schema_registry"`
+	Auth           AuthStore              `json:"auth_store"`
 }
 
 func NewFileStorage(statePath, messagesPath string) (*FileStorage, error) {

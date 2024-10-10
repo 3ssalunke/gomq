@@ -35,6 +35,7 @@ type BrokerServiceClient interface {
 	GetExchangeSchema(ctx context.Context, in *GetExchangeSchemaRequest, opts ...grpc.CallOption) (*GetExchangeSchemaResponse, error)
 	CreateAdmin(ctx context.Context, in *CreateUserRequest, opts ...grpc.CallOption) (*CreateUserResponse, error)
 	CreateUser(ctx context.Context, in *CreateUserRequest, opts ...grpc.CallOption) (*CreateUserResponse, error)
+	RevokeApiKey(ctx context.Context, in *RevokeApiKeyRequest, opts ...grpc.CallOption) (*BrokerResponse, error)
 }
 
 type brokerServiceClient struct {
@@ -185,6 +186,15 @@ func (c *brokerServiceClient) CreateUser(ctx context.Context, in *CreateUserRequ
 	return out, nil
 }
 
+func (c *brokerServiceClient) RevokeApiKey(ctx context.Context, in *RevokeApiKeyRequest, opts ...grpc.CallOption) (*BrokerResponse, error) {
+	out := new(BrokerResponse)
+	err := c.cc.Invoke(ctx, "/gomq.broker.BrokerService/RevokeApiKey", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BrokerServiceServer is the server API for BrokerService service.
 // All implementations must embed UnimplementedBrokerServiceServer
 // for forward compatibility
@@ -202,6 +212,7 @@ type BrokerServiceServer interface {
 	GetExchangeSchema(context.Context, *GetExchangeSchemaRequest) (*GetExchangeSchemaResponse, error)
 	CreateAdmin(context.Context, *CreateUserRequest) (*CreateUserResponse, error)
 	CreateUser(context.Context, *CreateUserRequest) (*CreateUserResponse, error)
+	RevokeApiKey(context.Context, *RevokeApiKeyRequest) (*BrokerResponse, error)
 	mustEmbedUnimplementedBrokerServiceServer()
 }
 
@@ -247,6 +258,9 @@ func (UnimplementedBrokerServiceServer) CreateAdmin(context.Context, *CreateUser
 }
 func (UnimplementedBrokerServiceServer) CreateUser(context.Context, *CreateUserRequest) (*CreateUserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateUser not implemented")
+}
+func (UnimplementedBrokerServiceServer) RevokeApiKey(context.Context, *RevokeApiKeyRequest) (*BrokerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RevokeApiKey not implemented")
 }
 func (UnimplementedBrokerServiceServer) mustEmbedUnimplementedBrokerServiceServer() {}
 
@@ -498,6 +512,24 @@ func _BrokerService_CreateUser_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BrokerService_RevokeApiKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeApiKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BrokerServiceServer).RevokeApiKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/gomq.broker.BrokerService/RevokeApiKey",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BrokerServiceServer).RevokeApiKey(ctx, req.(*RevokeApiKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // BrokerService_ServiceDesc is the grpc.ServiceDesc for BrokerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -552,6 +584,10 @@ var BrokerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateUser",
 			Handler:    _BrokerService_CreateUser_Handler,
+		},
+		{
+			MethodName: "RevokeApiKey",
+			Handler:    _BrokerService_RevokeApiKey_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

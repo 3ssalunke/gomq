@@ -25,6 +25,7 @@ func NewGoMQCLI(gomqClient *client.MQClient) *GoMQCLI {
 
 	cli.rootCmd.AddCommand(cli.createAdmin())
 	cli.rootCmd.AddCommand(cli.createUser())
+	cli.rootCmd.AddCommand(cli.revokeApiKey())
 	cli.rootCmd.AddCommand(cli.createExchangeCmd())
 	cli.rootCmd.AddCommand(cli.removeExchangeCmd())
 	cli.rootCmd.AddCommand(cli.createQueueCmd())
@@ -101,6 +102,30 @@ func (cli *GoMQCLI) createUser() *cobra.Command {
 
 	cmd.Flags().StringP("user-name", "u", "", "Name of the user")
 	cmd.Flags().StringP("user-role", "r", "", "Role of the user")
+
+	return cmd
+}
+
+func (cli *GoMQCLI) revokeApiKey() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "revoke-apikey",
+		Short: "Revoke api key",
+		Run: func(cmd *cobra.Command, args []string) {
+			apiKey, _ := cmd.Flags().GetString("apikey")
+
+			if apiKey == "" {
+				log.Fatal("please provide api key")
+			}
+
+			msg, err := cli.client.RevokeApiKey(apiKey)
+			if err != nil {
+				log.Fatal("error while creating user", err.Error())
+			}
+			log.Println("create-user message", msg)
+		},
+	}
+
+	cmd.Flags().StringP("apikey", "a", "", "API key to be revoked")
 
 	return cmd
 }

@@ -74,6 +74,23 @@ func (c *MQClient) CreateUser(username, role string) (string, error) {
 	return res.ApiKey, nil
 }
 
+func (c *MQClient) RevokeApiKey(apiKey string) (string, error) {
+	conn, client, err := c.createClient()
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	authContext := clientutil.GetAuthContext(context.Background(), c.Config.ApiKey)
+
+	res, err := client.RevokeApiKey(authContext, &protoc.RevokeApiKeyRequest{ApiKey: apiKey})
+	if err != nil {
+		return "", err
+	}
+
+	return res.Message, nil
+}
+
 func (c *MQClient) CreateExchange(name, extype, schema string) (string, error) {
 	conn, client, err := c.createClient()
 	if err != nil {

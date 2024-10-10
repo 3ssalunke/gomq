@@ -3,6 +3,7 @@ syntax = "proto3";
 option go_package = "./protoc";
 package gomq.broker;
 
+
 message Message {
   string id = 1;
   bytes payload = 2; // payload of any type
@@ -84,6 +85,11 @@ message CreateUserResponse{
   string api_key = 3;
 }
 
+message RevokeApiKeyRequest{
+  string api_key = 1;
+}
+
+
 service BrokerService {
   rpc CreateExchange(Exchange) returns (BrokerResponse);
   rpc RemoveExchange(RemoveExchangeRequest) returns (BrokerResponse);
@@ -98,4 +104,5 @@ service BrokerService {
   rpc GetExchangeSchema(GetExchangeSchemaRequest) returns (GetExchangeSchemaResponse);
   rpc CreateAdmin(CreateUserRequest) returns (CreateUserResponse);
   rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc RevokeApiKey(RevokeApiKeyRequest) returns (BrokerResponse);
 }

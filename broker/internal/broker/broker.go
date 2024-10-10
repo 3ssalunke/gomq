@@ -100,9 +100,18 @@ func (b *Broker) saveMetadata() error {
 		queueConfigs[key] = queue.Config
 	}
 
+	var authValue storage.AuthStore
+
+	authValue.Admin = *b.Auth.Admin
+	authValue.Users = make(map[string]auth.User)
+	for key, user := range b.Auth.Users {
+		authValue.Users[key] = *user
+	}
+
 	metadataJson, err := json.Marshal(&storage.BrokerMetadata{
 		QueueConfigs:   queueConfigs,
 		SchemaRegistry: b.schemaRegistry,
+		Auth:           authValue,
 	})
 	if err != nil {
 		return err
@@ -174,6 +183,21 @@ func (b *Broker) restoreBroker() error {
 		return nil
 	}
 
+	var brokerAuth auth.Auth
+	brokerAuth.Admin = &auth.User{
+		Name:   brokerMetadata.Auth.Admin.Name,
+		Role:   brokerMetadata.Auth.Admin.Role,
+		ApiKey: brokerMetadata.Auth.Admin.ApiKey,
+	}
+	brokerAuth.Users = make(map[string]*auth.User)
+	for key, user := range brokerMetadata.Auth.Users {
+		brokerAuth.Users[key] = &auth.User{
+			Name:   user.Name,
+			Role:   user.Role,
+			ApiKey: user.ApiKey,
+		}
+	}
+
 	queues := make(map[string]*storage.Queue)
 	pendingAcks := make(map[string]map[string]*storage.PendingAck)
 
@@ -224,6 +248,7 @@ func (b *Broker) restoreBroker() error {
 	b.queues = queues
 	b.pendingAcks = pendingAcks
 	b.schemaRegistry = brokerMetadata.SchemaRegistry
+	b.Auth = &brokerAuth
 
 	return nil
 }
@@ -233,6 +258,13 @@ func (b *Broker) CreateAdmin(username string) (string, error) {
 	if err != nil {
 		log.Printf("error while creating admin %v", err)
 		return "", fmt.Errorf("error while creating admin %v", err)
+	}
+
+	if err := b.saveMetadata(); err != nil {
+		log.Printf("error saving broker metadata %s, restroing broker state...", err.Error())
+
+		b.Auth.RemoveAdmin()
+		return "", err
 	}
 
 	return apiKey, nil
@@ -245,7 +277,31 @@ func (b *Broker) CreateUser(username, role string) (string, error) {
 		return "", fmt.Errorf("error while creating admin %v", err)
 	}
 
+	if err := b.saveMetadata(); err != nil {
+		log.Printf("error saving broker metadata %s, restroing broker state...", err.Error())
+
+		b.Auth.RemoveUserApiKey(apiKey)
+		return "", err
+	}
+
 	return apiKey, nil
+}
+
+func (b *Broker) RevokeApiKey(apiKey string) error {
+	user, err := b.Auth.RemoveUserApiKey(apiKey)
+	if err != nil {
+		log.Printf("error while creating admin %v", err)
+		return fmt.Errorf("error while creating admin %v", err)
+	}
+
+	if err := b.saveMetadata(); err != nil {
+		log.Printf("error saving broker metadata %s, restroing broker state...", err.Error())
+
+		b.Auth.Users[user.ApiKey] = user
+		return err
+	}
+
+	return nil
 }
 
 func (b *Broker) CreateExchange(name, exchangeType, exchangeSchema string) error {

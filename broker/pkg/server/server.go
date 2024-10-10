@@ -67,7 +67,42 @@ func (s *BrokerServiceServer) CreateUser(ctx context.Context, req *protoc.Create
 	}, nil
 }
 
+func (s *BrokerServiceServer) RevokeApiKey(ctx context.Context, req *protoc.RevokeApiKeyRequest) (*protoc.BrokerResponse, error) {
+	user, ok := ctx.Value(middleware.UserKey).(*auth.User)
+	if !ok {
+		return nil, status.Errorf(codes.Internal, "user not found in context")
+	}
+
+	if user.Role != auth.Admin {
+		return nil, status.Errorf(codes.PermissionDenied, "user is not admin")
+	}
+
+	apiKey := strings.TrimSpace(req.ApiKey)
+	if apiKey == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request arguments")
+	}
+
+	err := s.Broker.RevokeApiKey(apiKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &protoc.BrokerResponse{
+		Status:  true,
+		Message: fmt.Sprintf("api key %s has been successfully revoked", apiKey),
+	}, nil
+}
+
 func (s *BrokerServiceServer) CreateExchange(ctx context.Context, req *protoc.Exchange) (*protoc.BrokerResponse, error) {
+	user, ok := ctx.Value(middleware.UserKey).(*auth.User)
+	if !ok {
+		return nil, status.Errorf(codes.Internal, "user not found in context")
+	}
+
+	if user.Role != auth.Admin && user.Role != auth.Producer {
+		return nil, status.Errorf(codes.PermissionDenied, "user is not authorized for creating exchange")
+	}
+
 	exchangeName := strings.TrimSpace(req.Name)
 	exchangeType := strings.TrimSpace(req.Type)
 	exchangeSchema := strings.TrimSpace(req.Schema)
@@ -84,6 +119,15 @@ func (s *BrokerServiceServer) CreateExchange(ctx context.Context, req *protoc.Ex
 }
 
 func (s *BrokerServiceServer) RemoveExchange(ctx context.Context, req *protoc.RemoveExchangeRequest) (*protoc.BrokerResponse, error) {
+	user, ok := ctx.Value(middleware.UserKey).(*auth.User)
+	if !ok {
+		return nil, status.Errorf(codes.Internal, "user not found in context")
+	}
+
+	if user.Role != auth.Admin && user.Role != auth.Producer {
+		return nil, status.Errorf(codes.PermissionDenied, "user is not authorized for removing exchange")
+	}
+
 	exchangeName := strings.TrimSpace(req.ExchangeName)
 
 	if exchangeName == "" {
@@ -98,6 +142,15 @@ func (s *BrokerServiceServer) RemoveExchange(ctx context.Context, req *protoc.Re
 }
 
 func (s *BrokerServiceServer) CreateQueue(ctx context.Context, req *protoc.Queue) (*protoc.BrokerResponse, error) {
+	user, ok := ctx.Value(middleware.UserKey).(*auth.User)
+	if !ok {
+		return nil, status.Errorf(codes.Internal, "user not found in context")
+	}
+
+	if user.Role != auth.Admin && user.Role != auth.Producer {
+		return nil, status.Errorf(codes.PermissionDenied, "user is not authorized for creating queue")
+	}
+
 	queueName := strings.TrimSpace(req.Name)
 	queueConfig := storage.QueueConfig{
 		DLQ:        req.Dlq,
@@ -116,6 +169,15 @@ func (s *BrokerServiceServer) CreateQueue(ctx context.Context, req *protoc.Queue
 }
 
 func (s *BrokerServiceServer) RemoveQueue(ctx context.Context, req *protoc.RemoveQueueRequest) (*protoc.BrokerResponse, error) {
+	user, ok := ctx.Value(middleware.UserKey).(*auth.User)
+	if !ok {
+		return nil, status.Errorf(codes.Internal, "user not found in context")
+	}
+
+	if user.Role != auth.Admin && user.Role != auth.Producer {
+		return nil, status.Errorf(codes.PermissionDenied, "user is not authorized for removing queue")
+	}
+
 	exchangeName := strings.TrimSpace(req.ExchangeName)
 	queueName := strings.TrimSpace(req.QueueName)
 
@@ -131,6 +193,15 @@ func (s *BrokerServiceServer) RemoveQueue(ctx context.Context, req *protoc.Remov
 }
 
 func (s *BrokerServiceServer) BindQueue(ctx context.Context, req *protoc.Binding) (*protoc.BrokerResponse, error) {
+	user, ok := ctx.Value(middleware.UserKey).(*auth.User)
+	if !ok {
+		return nil, status.Errorf(codes.Internal, "user not found in context")
+	}
+
+	if user.Role != auth.Admin && user.Role != auth.Producer {
+		return nil, status.Errorf(codes.PermissionDenied, "user is not authorized for binding queue")
+	}
+
 	exchange := strings.TrimSpace(req.Exchange)
 	queue := strings.TrimSpace(req.Queue)
 	routingKey := strings.TrimSpace(req.RoutingKey)
@@ -147,6 +218,15 @@ func (s *BrokerServiceServer) BindQueue(ctx context.Context, req *protoc.Binding
 }
 
 func (s *BrokerServiceServer) PublishMessage(ctx context.Context, req *protoc.PublishMessageRequest) (*protoc.BrokerResponse, error) {
+	user, ok := ctx.Value(middleware.UserKey).(*auth.User)
+	if !ok {
+		return nil, status.Errorf(codes.Internal, "user not found in context")
+	}
+
+	if user.Role != auth.Admin && user.Role != auth.Producer {
+		return nil, status.Errorf(codes.PermissionDenied, "user is not authorized for publishing message")
+	}
+
 	exchange := strings.TrimSpace(req.Exchange)
 	routingKey := strings.TrimSpace(req.RoutingKey)
 
