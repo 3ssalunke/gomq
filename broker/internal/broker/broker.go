@@ -37,7 +37,7 @@ type Broker struct {
 
 	ackTimeout time.Duration
 
-	exchanges      map[string]string
+	exchanges      map[string]storage.ExchangeType
 	schemaRegistry map[string]string
 	queues         map[string]*storage.Queue
 	bindings       map[string]map[string][]string
@@ -74,7 +74,7 @@ func NewBroker(config config.Config) *Broker {
 	broker := &Broker{
 		config:            config,
 		ackTimeout:        time.Second * time.Duration(config.MessageAckTimeout),
-		exchanges:         make(map[string]string),
+		exchanges:         make(map[string]storage.ExchangeType),
 		schemaRegistry:    make(map[string]string),
 		queues:            make(map[string]*storage.Queue),
 		pendingAcks:       make(map[string]map[string]*storage.PendingAck),
@@ -318,7 +318,13 @@ func (b *Broker) CreateExchange(name, exchangeType, exchangeSchema string) error
 		return fmt.Errorf("error while validating protobuf message schema for payload %v", err)
 	}
 
-	b.exchanges[name] = exchangeType
+	eType, err := storage.NewExchangeType(exchangeType)
+	if err != nil {
+		log.Printf("exchange type %s is not valid", exchangeType)
+		return fmt.Errorf("exchange type %s is not valid", exchangeType)
+	}
+
+	b.exchanges[name] = eType
 	b.schemaRegistry[name] = exchangeSchema
 
 	metadataErr := b.saveMetadata()
@@ -503,11 +509,18 @@ func (b *Broker) PublishMessage(exchange, routingKey string, msg *storage.Messag
 		return fmt.Errorf("error while unmarshaling message payload bytes to protobuf message: %s", err.Error())
 	}
 
-	for queue, keys := range b.bindings[exchange] {
-		for _, key := range keys {
-			if key == routingKey {
-				b.queues[queue].Enqueue(msg)
-				log.Printf("route-queue %s-%s is enqueued with message %s", routingKey, queue, msg.ID)
+	if b.exchanges[exchange] == storage.Fanout {
+		for queue := range b.bindings[exchange] {
+			b.queues[queue].Enqueue(msg)
+			log.Printf("route-queue %s-%s is enqueued with message %s", routingKey, queue, msg.ID)
+		}
+	} else if b.exchanges[exchange] == storage.Direct {
+		for queue, keys := range b.bindings[exchange] {
+			for _, key := range keys {
+				if key == routingKey {
+					b.queues[queue].Enqueue(msg)
+					log.Printf("route-queue %s-%s is enqueued with message %s", routingKey, queue, msg.ID)
+				}
 			}
 		}
 	}

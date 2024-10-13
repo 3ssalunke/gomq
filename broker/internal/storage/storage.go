@@ -16,7 +16,7 @@ type FileStorage struct {
 }
 
 type BrokerState struct {
-	Exchanges   map[string]string              `json:"exchanges"`
+	Exchanges   map[string]ExchangeType        `json:"exchanges"`
 	Queues      map[string][]string            `json:"queues"`
 	Bindings    map[string]map[string][]string `json:"bindings"`
 	PendingAcks map[string][]string            `json:"pending_acks"`

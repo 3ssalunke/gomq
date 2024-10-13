@@ -31,11 +31,11 @@ func (r Role) String() string {
 
 func NewRole(role string) (Role, error) {
 	switch role {
-	case "Admin":
+	case "admin":
 		return Admin, nil
-	case "Producer":
+	case "producer":
 		return Producer, nil
-	case "Consumer":
+	case "consumer":
 		return Consumer, nil
 	default:
 		return 0, fmt.Errorf("invalid role: %s", role)
