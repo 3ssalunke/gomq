@@ -7,6 +7,7 @@ import (
 )
 
 type Config struct {
+	PeerNodes  []string
 	BrokerHost string
 	BrokerPort string
 
@@ -21,6 +22,8 @@ type Config struct {
 }
 
 func LoadConfig() Config {
+	viper.SetDefault("PEER_NODES", []string{})
+
 	viper.SetDefault("BROKER_HOST", "localhost")
 	viper.SetDefault("BROKER_PORT", "50051")
 
@@ -40,7 +43,10 @@ func LoadConfig() Config {
 		log.Printf("error reading config file %v\n", err)
 	}
 
+	viper.AutomaticEnv()
+
 	return Config{
+		PeerNodes:                 viper.GetStringSlice("PEER_NODES"),
 		BrokerHost:                viper.GetString("BROKER_HOST"),
 		BrokerPort:                viper.GetString("BROKER_PORT"),
 		BrokerStoreDir:            viper.GetString("BROKER_STORE_DIR"),

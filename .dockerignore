@@ -1,0 +1,8 @@
+.vscode
+bin
+descriptors
+store
+.env.broker.example
+.env.client.*
+README.md
+task-todo.txt
