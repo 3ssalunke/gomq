@@ -11,6 +11,7 @@ import (
 	"github.com/3ssalunke/gomq/broker/pkg/server"
 	"github.com/3ssalunke/gomq/shared/pkg/protoc"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
@@ -28,6 +29,8 @@ func main() {
 	)
 
 	protoc.RegisterBrokerServiceServer(grpcServer, &server.BrokerServiceServer{Broker: broker})
+
+	reflection.Register(grpcServer)
 
 	log.Printf("starting broker server at %s...\n", lis.Addr().String())
 

@@ -1,8 +1,11 @@
 .vscode
-bin
-descriptors
-store
 .env.broker.example
 .env.client.*
+
+bin
+client
+descriptors
+store
+
 README.md
 task-todo.txt
