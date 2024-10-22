@@ -6,8 +6,6 @@ services:
     container_name: gomq_broker_1
     environment:
       - PEER_NODES=broker2,broker3
-    ports:
-      - "5001:50051"
     networks:
       - gomq_network
 
@@ -18,8 +16,6 @@ services:
     container_name: gomq_broker_2
     environment:
       - PEER_NODES=broker1,broker3
-    ports:
-      - "5002:50051"
     networks:
       - gomq_network
 
@@ -30,8 +26,6 @@ services:
     container_name: gomq_broker_3
     environment:
       - PEER_NODES=broker1,broker2
-    ports:
-      - "5003:50051"
     networks:
       - gomq_network
 
@@ -39,7 +33,7 @@ services:
     image: nginx:latest
     container_name: gomq_nginx
     ports:
-      - "8080:80"
+      - "50051:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
     depends_on:
