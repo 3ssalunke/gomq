@@ -15,11 +15,19 @@ FROM alpine:latest
 
 WORKDIR /root/
 
-# temp
-# RUN apk update && apk add --no-cache curl
-# RUN curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.7/grpcurl_1.8.7_linux_x86_64.tar.gz
-# RUN tar -xvzf grpcurl_1.8.7_linux_x86_64.tar.gz
-# RUN mv grpcurl /usr/local/bin/
+ENV PROTOC_VERSION=28.3
+
+RUN apk add --no-cache \
+    bash \
+    git \
+    curl \
+    unzip \
+    build-base \
+    protobuf-dev
+
+RUN curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip && \
+    unzip protoc-${PROTOC_VERSION}-linux-x86_64.zip -d /usr/local && \
+    rm -f protoc-${PROTOC_VERSION}-linux-x86_64.zip
 
 COPY --from=build /app/bin/broker-linux .
 COPY --from=build /app/.env.broker .env.broker
