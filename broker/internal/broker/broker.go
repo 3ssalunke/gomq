@@ -33,7 +33,7 @@ type ConsumersList struct {
 }
 
 type Broker struct {
-	config config.Config
+	Config config.Config
 
 	ackTimeout time.Duration
 
@@ -72,7 +72,7 @@ func NewBroker(config config.Config) *Broker {
 	auth := auth.NewAuth()
 
 	broker := &Broker{
-		config:            config,
+		Config:            config,
 		ackTimeout:        time.Second * time.Duration(config.MessageAckTimeout),
 		exchanges:         make(map[string]storage.ExchangeType),
 		schemaRegistry:    make(map[string]string),
@@ -679,7 +679,7 @@ func (b *Broker) consumeMessage(queueName string, stopChan chan bool) {
 					log.Printf("message %s sent to consumer %s channel", message.ID, consumer.ID)
 					log.Printf("message %s is waiting for acknowdegement", message.ID)
 				default:
-					if consumer.Retries >= uint8(b.config.ConsumerConnectionRetries) {
+					if consumer.Retries >= uint8(b.Config.ConsumerConnectionRetries) {
 						b.consumers[queueName].Consumers = util.RemoveArrayElement(b.consumers[queueName].Consumers, nextIndex)
 
 						if len(b.consumers[queueName].Consumers) == 0 {
@@ -749,7 +749,7 @@ func (b *Broker) clearNackMessages() {
 		}
 
 		b.mu.Unlock()
-		time.Sleep(time.Second * time.Duration(b.config.MessageNackClearInterval))
+		time.Sleep(time.Second * time.Duration(b.Config.MessageNackClearInterval))
 	}
 }
 
@@ -798,4 +798,39 @@ func (b *Broker) GetExchangeSchema(exchangeName string) (string, error) {
 	}
 
 	return b.schemaRegistry[exchangeName], nil
+}
+
+func (b *Broker) SyncWithMasterState(authStore *auth.Auth, exchanges map[string]storage.ExchangeType, schemaRegistry map[string]string, queues map[string][]string, queueConfigs map[string]storage.QueueConfig, bindings map[string]map[string][]string) error {
+	b.Auth = authStore
+	b.exchanges = exchanges
+	b.schemaRegistry = schemaRegistry
+	b.bindings = bindings
+
+	_queues := make(map[string]*storage.Queue)
+	for queueName, configs := range queueConfigs {
+		var messages []*storage.Message
+
+		msgIDs := queues[queueName]
+		for _, msgID := range msgIDs {
+			message, err := b.fileStorage.GetMessage(msgID)
+			if err != nil {
+				continue
+			}
+			messages = append(messages, message)
+		}
+
+		_queues[queueName] = &storage.Queue{
+			Name: queueName,
+			Config: storage.QueueConfig{
+				DLQ:        configs.DLQ,
+				MaxRetries: configs.MaxRetries,
+			},
+			Messages: messages,
+			Mutex:    sync.Mutex{},
+		}
+	}
+
+	b.queues = _queues
+
+	return nil
 }

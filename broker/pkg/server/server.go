@@ -17,6 +17,7 @@ import (
 
 type BrokerServiceServer struct {
 	protoc.UnimplementedBrokerServiceServer
+	protoc.UnimplementedClusterSyncServer
 	Broker *broker.Broker
 }
 
@@ -355,4 +356,68 @@ func (s *BrokerServiceServer) GetExchangeSchema(ctx context.Context, req *protoc
 		Message: fmt.Sprintf("schema for exchange %s retrieved", exchangeName),
 		Schema:  schema,
 	}, nil
+}
+
+func (s *BrokerServiceServer) SyncCluster(ctx context.Context, req *protoc.SyncClusterStateRequest) (*protoc.SyncClusterStateResponse, error) {
+	if !s.Broker.Config.IsMaster {
+		log.Println("invalid rpc call, broker node is not slave")
+		return nil, status.Errorf(codes.PermissionDenied, "broker node is not slave")
+	}
+
+	_authStore := req.AuthStore
+	_exchanges := req.Exchanges
+	_schemaRegistry := req.SchemaRegistry
+	_queues := req.Queues
+	_queueConfigs := req.QueueConfigs
+	_bindings := req.Bindings
+
+	authStore := &auth.Auth{}
+	exchanges := make(map[string]storage.ExchangeType)
+	schemaRegistry := make(map[string]string)
+	queues := make(map[string][]string)
+	queueConfigs := make(map[string]storage.QueueConfig)
+	bindings := make(map[string]map[string][]string)
+
+	authStore.Admin.ApiKey = _authStore.Admin.ApiKey
+	authStore.Admin.Name = _authStore.Admin.Name
+	authStore.Admin.Role = auth.Role(_authStore.Admin.Role)
+
+	users := make(map[string]*auth.User)
+	for _key, _user := range _authStore.Users {
+		user := &auth.User{
+			ApiKey: _user.ApiKey,
+			Name:   _user.Name,
+			Role:   auth.Role(_user.Role),
+		}
+		users[_key] = user
+	}
+	authStore.Users = users
+
+	for _exchangeName, _exchangeType := range _exchanges {
+		exchanges[_exchangeName] = storage.ExchangeType(_exchangeType)
+	}
+
+	for _exchangeName, _exchangeSchema := range _schemaRegistry {
+		schemaRegistry[_exchangeName] = _exchangeSchema
+	}
+
+	for _queueName, msgIDs := range _queues {
+		queues[_queueName] = msgIDs.Elements
+		queueConfigs[_queueName] = storage.QueueConfig{
+			DLQ:        _queueConfigs[_queueName].Dlq,
+			MaxRetries: int8(_queueConfigs[_queueName].MaxRetries),
+		}
+	}
+
+	for _exchangeName, _bindings := range _bindings {
+		for _route, _queues := range _bindings.QueueBindings {
+			bindings[_exchangeName][_route] = _queues.Elements
+		}
+	}
+
+	if err := s.Broker.SyncWithMasterState(authStore, exchanges, schemaRegistry, queues, queueConfigs, bindings); err != nil {
+		return nil, status.Errorf(codes.Unknown, fmt.Sprintf("error while syncing with master %s", err.Error()))
+	}
+
+	return nil, nil
 }
