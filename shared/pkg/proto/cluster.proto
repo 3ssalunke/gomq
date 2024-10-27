@@ -3,40 +3,40 @@ syntax = "proto3";
 option go_package = "./protoc";
 package gomq.cluster;
 
+import "shared/pkg/proto/broker.proto";
+
+
 message User {
-    string name = 1;
-    int32 role = 2;
-    string api_key = 3;
+  string name = 1;
+  int32 role = 2;
+  string api_key = 3;
 }
 
 message AuthStore {
-    User admin = 1;
-    map<string, User> users = 2;
+  User admin = 1;
+  map<string, User> users = 2;
 }
 
 message QueueConfig {
-    bool dlq = 1;
-    int32 max_retries = 2;
-}
-
-message SyncMetadataRequest{
+  bool dlq = 1;
+  int32 max_retries = 2;
 }
 
 message StringList{
-    repeated string elements = 1;
+  repeated string elements = 1;
 }
 
 message Bindings{
-    map<string, StringList> queue_bindings = 1;
+  map<string, StringList> queue_bindings = 1;
 }
 
 message SyncClusterStateRequest{
-    AuthStore auth_store = 1;
-    map<string, int32> exchanges = 2;
-    map<string, string> schema_registry = 3;
-    map<string, QueueConfig> queue_configs = 4;
-    map<string, StringList> queues = 5;
-    map<string, Bindings> bindings = 6;
+  AuthStore auth_store = 1;
+  map<string, int32> exchanges = 2;
+  map<string, string> schema_registry = 3;
+  map<string, QueueConfig> queue_configs = 4;
+  map<string, StringList> queues = 5;
+  map<string, Bindings> bindings = 6;
 }
 
 message SyncClusterStateResponse{
@@ -44,6 +44,11 @@ message SyncClusterStateResponse{
   string message = 2;
 }
 
+message BroadCastMessageToPeerRequest{
+  gomq.broker.Message message = 1;
+}
+
 service ClusterSync {
-    rpc SyncCluster(SyncClusterStateRequest) returns (SyncClusterStateResponse);
+  rpc SyncCluster(SyncClusterStateRequest) returns (SyncClusterStateResponse);
+  rpc BroadCastMessageToPeer(BroadCastMessageToPeerRequest) returns(SyncClusterStateResponse);
 }

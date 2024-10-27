@@ -23,6 +23,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ClusterSyncClient interface {
 	SyncCluster(ctx context.Context, in *SyncClusterStateRequest, opts ...grpc.CallOption) (*SyncClusterStateResponse, error)
+	BroadCastMessageToPeer(ctx context.Context, in *BroadCastMessageToPeerRequest, opts ...grpc.CallOption) (*SyncClusterStateResponse, error)
 }
 
 type clusterSyncClient struct {
@@ -42,11 +43,21 @@ func (c *clusterSyncClient) SyncCluster(ctx context.Context, in *SyncClusterStat
 	return out, nil
 }
 
+func (c *clusterSyncClient) BroadCastMessageToPeer(ctx context.Context, in *BroadCastMessageToPeerRequest, opts ...grpc.CallOption) (*SyncClusterStateResponse, error) {
+	out := new(SyncClusterStateResponse)
+	err := c.cc.Invoke(ctx, "/gomq.cluster.ClusterSync/BroadCastMessageToPeer", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ClusterSyncServer is the server API for ClusterSync service.
 // All implementations must embed UnimplementedClusterSyncServer
 // for forward compatibility
 type ClusterSyncServer interface {
 	SyncCluster(context.Context, *SyncClusterStateRequest) (*SyncClusterStateResponse, error)
+	BroadCastMessageToPeer(context.Context, *BroadCastMessageToPeerRequest) (*SyncClusterStateResponse, error)
 	mustEmbedUnimplementedClusterSyncServer()
 }
 
@@ -56,6 +67,9 @@ type UnimplementedClusterSyncServer struct {
 
 func (UnimplementedClusterSyncServer) SyncCluster(context.Context, *SyncClusterStateRequest) (*SyncClusterStateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SyncCluster not implemented")
+}
+func (UnimplementedClusterSyncServer) BroadCastMessageToPeer(context.Context, *BroadCastMessageToPeerRequest) (*SyncClusterStateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BroadCastMessageToPeer not implemented")
 }
 func (UnimplementedClusterSyncServer) mustEmbedUnimplementedClusterSyncServer() {}
 
@@ -88,6 +102,24 @@ func _ClusterSync_SyncCluster_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ClusterSync_BroadCastMessageToPeer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BroadCastMessageToPeerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClusterSyncServer).BroadCastMessageToPeer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/gomq.cluster.ClusterSync/BroadCastMessageToPeer",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClusterSyncServer).BroadCastMessageToPeer(ctx, req.(*BroadCastMessageToPeerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ClusterSync_ServiceDesc is the grpc.ServiceDesc for ClusterSync service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -98,6 +130,10 @@ var ClusterSync_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SyncCluster",
 			Handler:    _ClusterSync_SyncCluster_Handler,
+		},
+		{
+			MethodName: "BroadCastMessageToPeer",
+			Handler:    _ClusterSync_BroadCastMessageToPeer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

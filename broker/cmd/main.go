@@ -29,6 +29,7 @@ func main() {
 	)
 
 	protoc.RegisterBrokerServiceServer(grpcServer, &server.BrokerServiceServer{Broker: broker})
+	protoc.RegisterClusterSyncServer(grpcServer, &server.ClusterSyncServer{Broker: broker})
 
 	reflection.Register(grpcServer)
 

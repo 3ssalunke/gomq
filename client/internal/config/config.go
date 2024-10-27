@@ -19,7 +19,7 @@ type Config struct {
 
 func LoadConfig() Config {
 	viper.SetDefault("API_KEY", "superadmin")
-	viper.SetDefault("BROKER_ADDR", "localhost")
+	viper.SetDefault("BROKER_ADDR", "localhost:50051")
 	viper.SetDefault("MAX_STREAM_RETRIES", "3")
 	viper.SetDefault("MAX_CONNECTION_RETRIES", "3")
 	viper.SetDefault("STREAM_BACKOFF_WAITTIME", "5")

@@ -1,9 +1,11 @@
 package broker
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -13,8 +15,11 @@ import (
 	"github.com/3ssalunke/gomq/broker/internal/config"
 	"github.com/3ssalunke/gomq/broker/internal/storage"
 	internalutil "github.com/3ssalunke/gomq/broker/internal/util"
+	"github.com/3ssalunke/gomq/shared/pkg/protoc"
 	"github.com/3ssalunke/gomq/shared/util"
 	"github.com/google/uuid"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -30,6 +35,11 @@ type Consumer struct {
 type ConsumersList struct {
 	Consumers []*Consumer
 	LastIndex int
+}
+
+type PeerConnection struct {
+	conn   *grpc.ClientConn
+	client protoc.ClusterSyncClient
 }
 
 type Broker struct {
@@ -52,6 +62,8 @@ type Broker struct {
 	fileStorage *storage.FileStorage
 
 	Auth *auth.Auth
+
+	peerConnections []PeerConnection
 
 	mu sync.Mutex
 }
@@ -86,9 +98,35 @@ func NewBroker(config config.Config) *Broker {
 		Auth:              auth,
 	}
 
+	if config.IsMaster {
+		for _, peerAddr := range broker.Config.PeerNodes {
+			retries := 1
+			var peerConnection PeerConnection
+			for {
+				if retries > 3 {
+					log.Fatal("failed to make connection with peer node after several retries")
+				}
+				conn, err := grpc.NewClient(fmt.Sprintf("%s:50051", peerAddr), grpc.WithTransportCredentials(insecure.NewCredentials()))
+				if err == nil {
+					peerConnection = PeerConnection{
+						conn:   conn,
+						client: protoc.NewClusterSyncClient(conn),
+					}
+					break
+				}
+				time.Sleep(time.Duration(math.Pow(2, float64(retries))) * time.Second)
+				fmt.Printf("failed to make connection with peer node %s, retrying...", err.Error())
+				retries++
+			}
+
+			broker.peerConnections = append(broker.peerConnections, peerConnection)
+		}
+	}
+
 	if err := broker.restoreBroker(); err != nil {
 		log.Fatal("error restoring broker state on startup", err.Error())
 	}
+
 	go broker.clearNackMessages()
 
 	return broker
@@ -157,6 +195,10 @@ func (b *Broker) saveState() error {
 
 	if err = b.fileStorage.StoreBrokerState(stateJson); err != nil {
 		return err
+	}
+
+	if b.Config.IsMaster && b.Auth.Admin != nil {
+		go b.broadcastMasterState()
 	}
 
 	log.Println("broker state saved")
@@ -552,7 +594,38 @@ func (b *Broker) PublishMessage(exchange, routingKey string, msg *storage.Messag
 		return err
 	}
 
+	if b.Config.IsMaster {
+		go b.broadcastMessageToPeers(msg)
+	}
+
 	return nil
+}
+
+func (b *Broker) broadcastMessageToPeers(msg *storage.Message) {
+	if len(b.Config.PeerNodes) == 0 {
+		return
+	}
+
+	message := &protoc.Message{
+		Id:        msg.ID,
+		Payload:   msg.Payload,
+		Timestamp: msg.Timestamp,
+	}
+	for _, peer := range b.peerConnections {
+		retries := 1
+		for {
+			if retries > 3 {
+				log.Println("failed to broadcast message to peer node after several retries")
+			}
+			_, err := peer.client.BroadCastMessageToPeer(context.Background(), &protoc.BroadCastMessageToPeerRequest{Message: message})
+			if err == nil {
+				break
+			}
+			time.Sleep(time.Duration(math.Pow(2, float64(retries))) * time.Second)
+			log.Printf("failed to broadcast message to peer node %s, retrying...", err.Error())
+			retries++
+		}
+	}
 }
 
 func (b *Broker) CreateConsumer(queueName string) (*Consumer, error) {
@@ -800,7 +873,111 @@ func (b *Broker) GetExchangeSchema(exchangeName string) (string, error) {
 	return b.schemaRegistry[exchangeName], nil
 }
 
+func (b *Broker) ProcessBroadcastedMessage(msg *storage.Message) error {
+	return b.fileStorage.StoreMessage(msg)
+}
+
+func (b *Broker) broadcastMasterState() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if len(b.Config.PeerNodes) == 0 {
+		return
+	}
+
+	log.Printf("broadcasting master state to cluster nodes...")
+
+	masterState := &protoc.SyncClusterStateRequest{
+		AuthStore:      nil,
+		Exchanges:      nil,
+		SchemaRegistry: nil,
+		QueueConfigs:   nil,
+		Queues:         nil,
+		Bindings:       nil,
+	}
+
+	authStore := &protoc.AuthStore{}
+	authStore.Admin = &protoc.User{
+		Name:   b.Auth.Admin.Name,
+		Role:   int32(b.Auth.Admin.Role),
+		ApiKey: b.Auth.Admin.ApiKey,
+	}
+	users := make(map[string]*protoc.User)
+	for apiKey, user := range b.Auth.Users {
+		users[apiKey] = &protoc.User{
+			Name:   user.Name,
+			Role:   int32(user.Role),
+			ApiKey: user.ApiKey,
+		}
+	}
+	authStore.Users = users
+	masterState.AuthStore = authStore
+
+	exchanges := make(map[string]int32)
+	for exchangeName, exchangeType := range b.exchanges {
+		exchanges[exchangeName] = int32(exchangeType)
+	}
+	masterState.Exchanges = exchanges
+
+	schemaRegistry := make(map[string]string)
+	for exchangeName, exchangeSchema := range b.schemaRegistry {
+		schemaRegistry[exchangeName] = exchangeSchema
+	}
+	masterState.SchemaRegistry = schemaRegistry
+
+	queues := make(map[string]*protoc.StringList)
+	queueConfigs := make(map[string]*protoc.QueueConfig)
+	for queueName, queue := range b.queues {
+		queueConfigs[queueName] = &protoc.QueueConfig{
+			Dlq:        queue.Config.DLQ,
+			MaxRetries: int32(queue.Config.MaxRetries),
+		}
+
+		msgIDs := make([]string, 0)
+		for _, message := range queue.Messages {
+			msgIDs = append(msgIDs, message.ID)
+		}
+
+		queues[queueName] = &protoc.StringList{Elements: msgIDs}
+	}
+	masterState.Queues = queues
+	masterState.QueueConfigs = queueConfigs
+
+	bindings := make(map[string]*protoc.Bindings)
+	for exchangeName, binding := range b.bindings {
+		queueBindings := make(map[string]*protoc.StringList)
+
+		for route, bindedQueues := range binding {
+			queueBindings[route] = &protoc.StringList{Elements: bindedQueues}
+		}
+
+		bindings[exchangeName] = &protoc.Bindings{
+			QueueBindings: queueBindings,
+		}
+	}
+	masterState.Bindings = bindings
+
+	for _, peer := range b.peerConnections {
+		retries := 1
+		for {
+			if retries > 3 {
+				log.Println("failed to broadcast state to peer node after several retries")
+			}
+			_, err := peer.client.SyncCluster(context.Background(), masterState)
+			if err == nil {
+				break
+			}
+			time.Sleep(time.Duration(math.Pow(2, float64(retries))) * time.Second)
+			log.Printf("failed to broadcast state to peer node %s, retrying...", err.Error())
+			retries++
+		}
+	}
+}
+
 func (b *Broker) SyncWithMasterState(authStore *auth.Auth, exchanges map[string]storage.ExchangeType, schemaRegistry map[string]string, queues map[string][]string, queueConfigs map[string]storage.QueueConfig, bindings map[string]map[string][]string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	b.Auth = authStore
 	b.exchanges = exchanges
 	b.schemaRegistry = schemaRegistry
@@ -831,6 +1008,8 @@ func (b *Broker) SyncWithMasterState(authStore *auth.Auth, exchanges map[string]
 	}
 
 	b.queues = _queues
+
+	b.saveMetadata()
 
 	return nil
 }

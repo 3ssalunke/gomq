@@ -7,6 +7,9 @@ services:
     environment:
       - PEER_NODES=broker2,broker3
       - IS_MASTER=true
+    depends_on:
+      - broker2
+      - broker3
     networks:
       - gomq_network
 

@@ -2,6 +2,7 @@ package config
 
 import (
 	"log"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -48,7 +49,7 @@ func LoadConfig() Config {
 	viper.AutomaticEnv()
 
 	return Config{
-		PeerNodes:                 viper.GetStringSlice("PEER_NODES"),
+		PeerNodes:                 strings.Split(viper.GetString("PEER_NODES"), ","),
 		IsMaster:                  viper.GetBool("IS_MASTER"),
 		BrokerHost:                viper.GetString("BROKER_HOST"),
 		BrokerPort:                viper.GetString("BROKER_PORT"),

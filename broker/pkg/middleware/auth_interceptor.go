@@ -28,7 +28,7 @@ func getApiKeyFromMetadata(md metadata.MD) string {
 
 func ApiKeyAuthInterceptor(auth *auth.Auth) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		if strings.HasPrefix(info.FullMethod, "/gomq.broker.BrokerService/CreateAdmin") {
+		if strings.HasPrefix(info.FullMethod, "/gomq.broker.BrokerService/CreateAdmin") || strings.HasPrefix(info.FullMethod, "/gomq.cluster.ClusterSync/BroadCastMessageToPeer") || strings.HasPrefix(info.FullMethod, "/gomq.cluster.ClusterSync/SyncCluster") {
 			return handler(ctx, req)
 		}
 
