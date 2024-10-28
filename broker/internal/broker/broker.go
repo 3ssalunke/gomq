@@ -878,9 +878,6 @@ func (b *Broker) ProcessBroadcastedMessage(msg *storage.Message) error {
 }
 
 func (b *Broker) broadcastMasterState() {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	if len(b.Config.PeerNodes) == 0 {
 		return
 	}
