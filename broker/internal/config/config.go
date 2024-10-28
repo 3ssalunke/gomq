@@ -48,8 +48,16 @@ func LoadConfig() Config {
 
 	viper.AutomaticEnv()
 
+	peerNodes := strings.Split(viper.GetString("PEER_NODES"), ",")
+	var fileterdNodes []string
+	for _, node := range peerNodes {
+		if node != "" {
+			fileterdNodes = append(fileterdNodes, node)
+		}
+	}
+
 	return Config{
-		PeerNodes:                 strings.Split(viper.GetString("PEER_NODES"), ","),
+		PeerNodes:                 fileterdNodes,
 		IsMaster:                  viper.GetBool("IS_MASTER"),
 		BrokerHost:                viper.GetString("BROKER_HOST"),
 		BrokerPort:                viper.GetString("BROKER_PORT"),

@@ -98,7 +98,7 @@ func NewBroker(config config.Config) *Broker {
 		Auth:              auth,
 	}
 
-	if config.IsMaster {
+	if config.IsMaster && len(broker.Config.PeerNodes) > 0 {
 		for _, peerAddr := range broker.Config.PeerNodes {
 			retries := 1
 			var peerConnection PeerConnection
@@ -197,7 +197,7 @@ func (b *Broker) saveState() error {
 		return err
 	}
 
-	if b.Config.IsMaster && b.Auth.Admin != nil {
+	if b.Config.IsMaster && len(b.Config.PeerNodes) > 0 && b.Auth.Admin != nil {
 		go b.broadcastMasterState()
 	}
 
@@ -594,7 +594,7 @@ func (b *Broker) PublishMessage(exchange, routingKey string, msg *storage.Messag
 		return err
 	}
 
-	if b.Config.IsMaster {
+	if b.Config.IsMaster && len(b.Config.PeerNodes) > 0 {
 		go b.broadcastMessageToPeers(msg)
 	}
 
@@ -602,10 +602,7 @@ func (b *Broker) PublishMessage(exchange, routingKey string, msg *storage.Messag
 }
 
 func (b *Broker) broadcastMessageToPeers(msg *storage.Message) {
-	if len(b.Config.PeerNodes) == 0 {
-		return
-	}
-
+	log.Println("broadcasting published message to peers...")
 	message := &protoc.Message{
 		Id:        msg.ID,
 		Payload:   msg.Payload,
@@ -878,10 +875,6 @@ func (b *Broker) ProcessBroadcastedMessage(msg *storage.Message) error {
 }
 
 func (b *Broker) broadcastMasterState() {
-	if len(b.Config.PeerNodes) == 0 {
-		return
-	}
-
 	log.Printf("broadcasting master state to cluster nodes...")
 
 	masterState := &protoc.SyncClusterStateRequest{
