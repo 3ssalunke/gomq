@@ -26,7 +26,7 @@ type Message struct {
 	unknownFields protoimpl.UnknownFields
 
 	Id        string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Payload   []byte `protobuf:"bytes,2,opt,name=payload,proto3" json:"payload,omitempty"` // payload of any type
+	Payload   []byte `protobuf:"bytes,2,opt,name=payload,proto3" json:"payload,omitempty"`
 	Timestamp int64  `protobuf:"varint,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 }
 
@@ -90,7 +90,7 @@ type Exchange struct {
 
 	Name   string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Type   string `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
-	Schema string `protobuf:"bytes,3,opt,name=schema,proto3" json:"schema,omitempty"` // protobuf message schema in string form
+	Schema string `protobuf:"bytes,3,opt,name=schema,proto3" json:"schema,omitempty"`
 }
 
 func (x *Exchange) Reset() {

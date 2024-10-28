@@ -487,7 +487,12 @@ func (c *MQClient) RedriveDlqMessages(queueName string) (string, error) {
 	}
 	defer conn.Close()
 
-	res, err := client.RedriveDlqMessages(context.TODO(), &protoc.Queue{Name: queueName})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	authContext := clientutil.GetAuthContext(ctx, c.Config.ApiKey)
+
+	res, err := client.RedriveDlqMessages(authContext, &protoc.Queue{Name: queueName})
 	if err != nil {
 		return "", err
 	}
