@@ -90,7 +90,7 @@ Navigate to the directory where the `cli` binary is located and run:
 #### Remove an Queue
 
 ```bash
-./cli remove-queue -e <exchange-name> -q <queue-name> -d true -m 5
+./cli remove-queue -e <exchange-name> -q <queue-name>
 ```
 
 #### Bind a queue
