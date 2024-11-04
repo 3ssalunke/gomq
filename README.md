@@ -49,18 +49,48 @@ By default, the server listens on localhost:50051 for incoming gRPC connections.
 
 Below are some common tasks you can perform with the GoMQ CLI:
 
-#### Create an Exchange
+#### Create an Admin user
 
 Navigate to the directory where the `cli` binary is located and run:
 
 ```bash
-./cli create-exchange -e <exchange-name> -t <exchange-type>
+./cli create-admin -u <user-name>
+```
+
+#### Create an User
+
+```bash
+./cli create-user -u <user-name> -r <user-role>
+```
+
+#### Revoke an Apikey
+
+```bash
+./cli revoke-apikey -a <apikey>
+```
+
+#### Create an Exchange
+
+```bash
+./cli create-exchange -e <exchange-name> -t <exchange-type> -s <exchange-schema>
+```
+
+#### Remove an Exchange
+
+```bash
+./cli remove-exchange -e <exchange-name>
 ```
 
 #### Create an Queue
 
 ```bash
 ./cli create-queue -q <queue-name> -d true -m 5
+```
+
+#### Remove an Queue
+
+```bash
+./cli remove-queue -e <exchange-name> -q <queue-name> -d true -m 5
 ```
 
 #### Bind a queue
