@@ -82,7 +82,9 @@ jobs:
         run: echo "VERSION=$(cat ./.github/version.txt)" >> $GITHUB_ENV
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1.1.0
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: "${{ env.VERSION }}"
           release_name: "GoMQ ${{ env.VERSION }}: Initial Release"
