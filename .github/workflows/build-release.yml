@@ -107,6 +107,8 @@ jobs:
           prerelease: true
       - name: Upload macOS Broker Binary
         uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./artifacts/broker-macos
@@ -114,6 +116,8 @@ jobs:
           asset_content_type: application/octet-stream
       - name: Upload Linux Broker Binary
         uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./artifacts/broker-linux
@@ -121,6 +125,8 @@ jobs:
           asset_content_type: application/octet-stream
       - name: Upload Windows Broker Binary
         uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./artifacts/broker.exe
@@ -128,6 +134,8 @@ jobs:
           asset_content_type: application/octet-stream
       - name: Upload macOS CLI Binary
         uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./artifacts/cli-macos
@@ -135,6 +143,8 @@ jobs:
           asset_content_type: application/octet-stream
       - name: Upload Linux CLI Binary
         uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./artifacts/cli-linux
@@ -142,6 +152,8 @@ jobs:
           asset_content_type: application/octet-stream
       - name: Upload Windows CLI Binary
         uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./artifacts/cli.exe
