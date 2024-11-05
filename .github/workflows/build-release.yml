@@ -29,6 +29,8 @@ jobs:
         id: build-broker-macos
         run: |
           make build-broker-macos
+          ls -la
+          ls ./bin
           echo "binary-path=./bin/broker-macos" >> $GITHUB_OUTPUT
       - name: Build Linux Broker Binary
         id: build-broker-linux
