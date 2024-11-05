@@ -6,4 +6,4 @@ descriptors
 .env.broker
 .env.client
 
-*.txt
+task-todo.txt

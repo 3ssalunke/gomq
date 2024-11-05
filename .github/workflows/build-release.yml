@@ -1,0 +1,142 @@
+name: Build and Release Go Binaries
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      mac-broker-binary: ${{ steps.build-broker-macos.outputs.binary-path }}
+      linux-broker-binary: ${{ steps.build-broker-linux.outputs.binary-path }}
+      windows-broker-binary: ${{ steps.build-broker-windows.outputs.binary-path }}
+      mac-cli-binary: ${{ steps.build-cli-macos.outputs.binary-path }}
+      linux-cli-binary: ${{ steps.build-cli-linux.outputs.binary-path }}
+      windows-cli-binary: ${{ steps.build-cli-windows.outputs.binary-path }}
+
+    steps:
+      # Checkout the code
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Set up Go environment
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+
+      # Build macOS broker binary using Makefile
+      - name: Build macOS Broker Binary
+        id: build-broker-macos
+        run: make build-broker-macos
+        outputs:
+          binary-path: ./bin/broker-macos # Adjust this path based on your Makefile's output
+
+      # Build Linux broker binary using Makefile
+      - name: Build Linux Broker Binary
+        id: build-broker-linux
+        run: make build-broker-linux
+        outputs:
+          binary-path: ./bin/broker-linux # Adjust this path as needed
+
+      # Build Windows broker binary using Makefile
+      - name: Build Windows Broker Binary
+        id: build-broker-windows
+        run: make build-broker
+        outputs:
+          binary-path: ./bin/broker.exe # Adjust as needed
+
+      # Build macOS CLI binary using Makefile
+      - name: Build macOS CLI Binary
+        id: build-cli-macos
+        run: make build-cli-macos
+        outputs:
+          binary-path: ./dist/cli-macos # Adjust this path based on your Makefile's output
+
+      # Build Linux CLI binary using Makefile
+      - name: Build Linux CLI Binary
+        id: build-cli-linux
+        run: make build-cli-linux
+        outputs:
+          binary-path: ./dist/cli-linux # Adjust this path as needed
+
+      # Build Windows CLI binary using Makefile
+      - name: Build Windows CLI Binary
+        id: build-cli-windows
+        run: make build-cli
+        outputs:
+          binary-path: ./bin/cli.exe # Adjust as needed
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      # Checkout the code (optional, to include release notes or metadata)
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set Tag Version
+        run: echo "VERSION=$(cat version.txt)" >> $GITHUB_ENV
+
+      # Upload artifacts to GitHub Releases
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: "${{ env.VERSION }}"
+          release_name: "GoMQ ${{ env.VERSION }}: Initial Release"
+          draft: false
+          prerelease: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Upload broker binary assets to the release
+      - name: Upload macOS Broker Binary
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ needs.build.outputs.mac-broker-binary }}
+          asset_name: broker-macos
+          asset_content_type: application/octet-stream
+
+      - name: Upload Linux Broker Binary
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ needs.build.outputs.linux-broker-binary }}
+          asset_name: broker-linux
+          asset_content_type: application/octet-stream
+
+      - name: Upload Windows Broker Binary
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ needs.build.outputs.windows-broker-binary }}
+          asset_name: broker.exe
+          asset_content_type: application/octet-stream
+
+      # Upload broker cli binary assets to the release
+      - name: Upload macOS CLI Binary
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ needs.build.outputs.mac-cli-binary }}
+          asset_name: cli-macos
+          asset_content_type: application/octet-stream
+
+      - name: Upload Linux CLI Binary
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ needs.build.outputs.linux-cli-binary }}
+          asset_name: cli-linux
+          asset_content_type: application/octet-stream
+
+      - name: Upload Windows CLI Binary
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ needs.build.outputs.windows-cli-binary }}
+          asset_name: cli.exe
+          asset_content_type: application/octet-stream
