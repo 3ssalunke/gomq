@@ -15,41 +15,36 @@ jobs:
       mac-cli-binary: ${{ steps.build-cli-macos.outputs.binary-path }}
       linux-cli-binary: ${{ steps.build-cli-linux.outputs.binary-path }}
       windows-cli-binary: ${{ steps.build-cli-windows.outputs.binary-path }}
-    uses: ./.github/workflows/common-checkout.yml
-    with:
-      go-version: "1.21"
     steps:
-      # Build macOS broker binary using Makefile
+      - name: Common Checkout and Setup
+        uses: ./.github/actions/common-checkout
+        with:
+          go-version: "1.21"
       - name: Build macOS Broker Binary
         id: build-broker-macos
         run: |
           make build-broker-macos
           echo "binary-path=./bin/broker-macos" >> $GITHUB_OUTPUT
-      # Build Linux broker binary using Makefile
       - name: Build Linux Broker Binary
         id: build-broker-linux
         run: |
           make build-broker-linux
           echo "binary-path=./bin/broker-linux" >> $GITHUB_OUTPUT
-      # Build Windows broker binary using Makefile
       - name: Build Windows Broker Binary
         id: build-broker-windows
         run: |
           make build-broker
           echo "binary-path=./bin/broker.exe" >> $GITHUB_OUTPUT
-      # Build macOS CLI binary using Makefile
       - name: Build macOS CLI Binary
         id: build-cli-macos
         run: |
           make build-cli-macos
           echo "binary-path=./bin/cli-macos" >> $GITHUB_OUTPUT
-      # Build Linux CLI binary using Makefile
       - name: Build Linux CLI Binary
         id: build-cli-linux
         run: |
           make build-cli-linux
           echo "binary-path=./bin/cli-linux" >> $GITHUB_OUTPUT
-      # Build Windows CLI binary using Makefile
       - name: Build Windows CLI Binary
         id: build-cli-windows
         run: |
@@ -59,11 +54,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: build
-    uses: ./.github/workflows/common-checkout.yml
-    with:
-      go-version: "1.21"
     steps:
-      # Run Go tests
+      - name: Common Checkout and Setup
+        uses: ./.github/actions/common-checkout
+        with:
+          go-version: "1.21"
       - name: Run Tests
         run: make run-tests
 
@@ -71,22 +66,19 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     steps:
-      # Checkout the code (optional, to include release notes or metadata)
       - name: Checkout Code
         uses: actions/checkout@v3
       - name: Set Tag Version
         run: echo "VERSION=$(cat ./.github/version.txt)" >> $GITHUB_ENV
-      # Upload artifacts to GitHub Releases
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
         with:
           tag_name: "${{ env.VERSION }}"
           release_name: "GoMQ ${{ env.VERSION }}: Initial Release"
-          draft: false
+          draft: true
           prerelease: true
           token: ${{ secrets.GITHUB_TOKEN }}
-      # Upload broker binary assets to the release
       - name: Upload macOS Broker Binary
         uses: actions/upload-release-asset@v1
         with:
@@ -108,7 +100,6 @@ jobs:
           asset_path: ${{ needs.build.outputs.windows-broker-binary }}
           asset_name: broker.exe
           asset_content_type: application/octet-stream
-      # Upload broker cli binary assets to the release
       - name: Upload macOS CLI Binary
         uses: actions/upload-release-asset@v1
         with:
