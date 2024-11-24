@@ -9,7 +9,7 @@ import (
 
 type Config struct {
 	PeerNodes  []string
-	IsMaster   bool
+	IsLeader   bool
 	BrokerHost string
 	BrokerPort string
 
@@ -25,7 +25,7 @@ type Config struct {
 
 func LoadConfig() Config {
 	viper.SetDefault("PEER_NODES", []string{})
-	viper.SetDefault("IS_MASTER", false)
+	viper.SetDefault("IS_LEADER", false)
 
 	viper.SetDefault("BROKER_HOST", "localhost")
 	viper.SetDefault("BROKER_PORT", "50051")
@@ -58,7 +58,7 @@ func LoadConfig() Config {
 
 	return Config{
 		PeerNodes:                 fileterdNodes,
-		IsMaster:                  viper.GetBool("IS_MASTER"),
+		IsLeader:                  viper.GetBool("IS_LEADER"),
 		BrokerHost:                viper.GetString("BROKER_HOST"),
 		BrokerPort:                viper.GetString("BROKER_PORT"),
 		BrokerStoreDir:            viper.GetString("BROKER_STORE_DIR"),

@@ -6,7 +6,7 @@ services:
     container_name: gomq_broker_1
     environment:
       - PEER_NODES=broker2,broker3
-      - IS_MASTER=true
+      - IS_LEADER=true
     depends_on:
       - broker2
       - broker3

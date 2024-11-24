@@ -20,7 +20,7 @@ type ClusterSyncServer struct {
 }
 
 func (s *ClusterSyncServer) BroadCastMessageToPeer(ctx context.Context, req *protoc.BroadCastMessageToPeerRequest) (*protoc.SyncClusterStateResponse, error) {
-	if s.Broker.Config.IsMaster {
+	if s.Broker.Config.IsLeader {
 		log.Println("invalid rpc call, broker node is not slave")
 		return nil, status.Errorf(codes.PermissionDenied, "broker node is not slave")
 	}
@@ -39,7 +39,7 @@ func (s *ClusterSyncServer) BroadCastMessageToPeer(ctx context.Context, req *pro
 }
 
 func (s *ClusterSyncServer) SyncCluster(ctx context.Context, req *protoc.SyncClusterStateRequest) (*protoc.SyncClusterStateResponse, error) {
-	if s.Broker.Config.IsMaster {
+	if s.Broker.Config.IsLeader {
 		log.Println("invalid rpc call, broker node is not slave")
 		return nil, status.Errorf(codes.PermissionDenied, "broker node is not slave")
 	}

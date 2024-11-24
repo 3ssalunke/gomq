@@ -98,7 +98,7 @@ func NewBroker(config config.Config) *Broker {
 		Auth:              auth,
 	}
 
-	if config.IsMaster && len(broker.Config.PeerNodes) > 0 {
+	if config.IsLeader && len(broker.Config.PeerNodes) > 0 {
 		for _, peerAddr := range broker.Config.PeerNodes {
 			retries := 1
 			var peerConnection PeerConnection
@@ -197,7 +197,7 @@ func (b *Broker) saveState() error {
 		return err
 	}
 
-	if b.Config.IsMaster && len(b.Config.PeerNodes) > 0 && b.Auth.Admin != nil {
+	if b.Config.IsLeader && len(b.Config.PeerNodes) > 0 && b.Auth.Admin != nil {
 		go b.broadcastMasterState()
 	}
 
@@ -594,7 +594,7 @@ func (b *Broker) PublishMessage(exchange, routingKey string, msg *storage.Messag
 		return err
 	}
 
-	if b.Config.IsMaster && len(b.Config.PeerNodes) > 0 {
+	if b.Config.IsLeader && len(b.Config.PeerNodes) > 0 {
 		go b.broadcastMessageToPeers(msg)
 	}
 
